@@ -7,8 +7,8 @@ interface SessionData {
     userId: string;
     email: string;
     role: UserRole;
-    tenantId: string;
-    branchId?: string;
+    tenantId: string | null;
+    branchId: string | null;
   };
 }
 
@@ -17,8 +17,8 @@ export interface AuthRequest extends Request {
     userId: string;
     email: string;
     role: UserRole;
-    tenantId: string;
-    branchId?: string;
+    tenantId: string | null;
+    branchId: string | null;
   };
   session: Session & SessionData;
 }
@@ -34,8 +34,8 @@ export const authenticate = (
       userId: req.session.user.userId,
       email: req.session.user.email,
       role: req.session.user.role,
-      tenantId: req.session.user.tenantId,
-      branchId: req.session.user.branchId,
+      tenantId: req.session.user.tenantId ?? null,
+      branchId: req.session.user.branchId ?? null,
     };
     next();
     return;
