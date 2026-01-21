@@ -21,10 +21,31 @@ export class BranchService {
   }
 
   async getBranchesByTenant(tenantId: string) {
-    return await this.branchRepository.find({
-      where: { tenant: { id: tenantId } },
-      relations: ["tenant"],
-    });
+    if (!tenantId) {
+      throw new Error("Tenant ID is required");
+    }
+    try {
+      return await this.branchRepository.find({
+        where: { tenant: { id: tenantId } },
+        relations: ["tenant"],
+        order: { name: "ASC" },
+      });
+    } catch (error: any) {
+      console.error("Error in getBranchesByTenant:", error);
+      throw new Error(`Failed to fetch branches: ${error.message}`);
+    }
+  }
+
+  async getAllBranches() {
+    try {
+      return await this.branchRepository.find({
+        relations: ["tenant"],
+        order: { name: "ASC" },
+      });
+    } catch (error: any) {
+      console.error("Error in getAllBranches:", error);
+      throw new Error(`Failed to fetch all branches: ${error.message}`);
+    }
   }
 
   async getBranchById(id: string) {
