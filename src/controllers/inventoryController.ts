@@ -12,23 +12,53 @@ export class InventoryController {
       const tenantId = req.user?.tenantId;
       const branchId = req.user?.branchId || req.body.branchId;
 
-      if (!tenantId || !branchId) {
+      // Super Admin can provide tenantId in body if needed
+      const finalTenantId = tenantId || req.body.tenantId;
+
+      if (!finalTenantId) {
         res.status(400).json({
-          message: "Tenant ID and Branch ID are required",
+          message: "Tenant ID is required",
         });
         return;
       }
 
-      if (!productVariantId || !quantity || !costPrice || !sellingPrice) {
+      if (!branchId) {
         res.status(400).json({
-          message:
-            "Product variant, quantity, cost price, and selling price are required",
+          message: "Branch ID is required",
+        });
+        return;
+      }
+
+      if (!productVariantId) {
+        res.status(400).json({
+          message: "Product variant is required",
+        });
+        return;
+      }
+
+      if (!quantity || quantity <= 0) {
+        res.status(400).json({
+          message: "Valid quantity is required",
+        });
+        return;
+      }
+
+      if (!costPrice || costPrice <= 0) {
+        res.status(400).json({
+          message: "Valid cost price is required",
+        });
+        return;
+      }
+
+      if (!sellingPrice || sellingPrice <= 0) {
+        res.status(400).json({
+          message: "Valid selling price is required",
         });
         return;
       }
 
       const inventory = await inventoryService.stockIn(
-        tenantId,
+        finalTenantId,
         branchId,
         productVariantId,
         quantity,
@@ -39,7 +69,10 @@ export class InventoryController {
 
       res.status(201).json(inventory);
     } catch (error: any) {
-      res.status(400).json({ message: error.message });
+      console.error("Stock in error:", error);
+      res.status(400).json({ 
+        message: error.message || "Failed to add stock. Please check your input and try again." 
+      });
     }
   }
 
