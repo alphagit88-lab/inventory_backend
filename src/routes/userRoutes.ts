@@ -11,6 +11,13 @@ const userController = new UserController();
 router.use(authenticate, ensureTenantIsolation);
 
 // Create Branch User - Store Admin and Super Admin only
+// Support both /users and /users/branch-user for backward compatibility
+router.post(
+  "/",
+  authorize(UserRole.STORE_ADMIN, UserRole.SUPER_ADMIN),
+  (req, res) => userController.createBranchUser(req, res)
+);
+
 router.post(
   "/branch-user",
   authorize(UserRole.STORE_ADMIN, UserRole.SUPER_ADMIN),

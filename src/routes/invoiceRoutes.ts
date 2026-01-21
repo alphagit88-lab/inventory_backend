@@ -33,4 +33,9 @@ router.get("/reports/daily-sales", (req, res) =>
   invoiceController.getDailySales(req, res)
 );
 
+// Branch-specific daily sales endpoint for Branch Users
+router.get("/branch/:branchId/daily-sales", (req, res) =>
+  invoiceController.getDailySalesByBranch(req, res)
+);
+
 export default router;
