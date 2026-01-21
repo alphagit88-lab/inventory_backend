@@ -6,6 +6,12 @@ export const ensureTenantIsolation = (
   res: Response,
   next: NextFunction
 ): void => {
+  // If no request object (shouldn't happen), fail fast
+  if (!req) {
+    res.status(500).json({ message: "Invalid request" });
+    return;
+  }
+
   if (!req.user) {
     res.status(401).json({ message: "Authentication required" });
     return;
@@ -19,7 +25,9 @@ export const ensureTenantIsolation = (
 
   // For other users, ensure tenant isolation
   const tenantIdFromRequest =
-    req.body.tenant_id || req.params.tenantId || req.query.tenant_id;
+    (req.body && (req.body.tenant_id || req.body.tenantId)) ||
+    (req.params && (req.params.tenantId || req.params.tenant_id)) ||
+    (req.query && (req.query.tenant_id as string | undefined));
 
   if (tenantIdFromRequest && tenantIdFromRequest !== req.user.tenantId) {
     res
