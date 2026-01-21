@@ -163,4 +163,54 @@ export class InvoiceController {
       res.status(500).json({ message: error.message });
     }
   }
+
+  async getDailySalesByBranch(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const branchId = req.params.branchId || req.user?.branchId;
+      const date = req.query.date ? new Date(req.query.date as string) : new Date();
+
+      if (!branchId) {
+        res.status(400).json({ message: "Branch ID is required" });
+        return;
+      }
+
+      // Branch Users can only access their own branch's data
+      if (
+        req.user?.role === "branch_user" &&
+        req.user?.branchId !== branchId
+      ) {
+        res.status(403).json({
+          message: "Access denied: You can only view your own branch's data",
+        });
+        return;
+      }
+
+      const startDate = new Date(date);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(date);
+      endDate.setHours(23, 59, 59, 999);
+
+      const invoices = await invoiceService.getInvoicesByDateRange(
+        branchId as string,
+        startDate,
+        endDate
+      );
+
+      const totalRevenue = invoices.reduce(
+        (sum, invoice) => sum + Number(invoice.total_amount),
+        0
+      );
+      const totalInvoices = invoices.length;
+
+      res.json({
+        date: date.toISOString().split("T")[0],
+        branchId,
+        totalRevenue,
+        totalInvoices,
+        invoices,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  }
 }
