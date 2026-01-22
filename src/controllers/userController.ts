@@ -140,7 +140,7 @@ export class UserController {
       }
 
       // Prevent Store Admin from deleting themselves
-      if (req.user?.id === id) {
+      if (req.user?.userId === id) {
         res.status(403).json({
           message: "You cannot delete your own account",
         });
