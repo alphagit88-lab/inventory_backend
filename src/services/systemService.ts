@@ -44,6 +44,53 @@ export class SystemService {
       branchCount: tenant.branches.length,
     }));
 
+    // Get all branches with tenant info
+    const branches = await this.branchRepository.find({
+      relations: ["tenant"],
+      order: { name: "ASC" },
+    });
+
+    const branchesWithStats = branches.map((branch) => ({
+      id: branch.id,
+      name: branch.name,
+      address: branch.address,
+      phone: branch.phone,
+      tenantName: branch.tenant.name,
+      tenantId: branch.tenant.id,
+    }));
+
+    // Get all users with tenant and branch info
+    const users = await this.userRepository.find({
+      relations: ["tenant", "branch"],
+      order: { email: "ASC" },
+    });
+
+    const usersWithStats = users.map((user) => ({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      tenantName: user.tenant?.name || null,
+      branchName: user.branch?.name || null,
+    }));
+
+    // Get inventory items with product and branch info
+    const inventoryItems = await this.inventoryRepository.find({
+      relations: ["product_variant", "product_variant.product", "branch", "branch.tenant"],
+      take: 100, // Limit to 100 items
+    });
+
+    const inventoryWithStats = inventoryItems.map((item) => ({
+      id: item.id,
+      productName: item.product_variant?.product?.name || "Unknown",
+      brand: item.product_variant?.brand || "N/A",
+      size: item.product_variant?.size || "N/A",
+      quantity: item.quantity,
+      costPrice: item.cost_price,
+      sellingPrice: item.selling_price,
+      branchName: item.branch?.name || "Unknown",
+      tenantName: item.branch?.tenant?.name || "Unknown",
+    }));
+
     // Calculate total revenue (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -54,6 +101,19 @@ export class SystemService {
       .where("invoice.created_at >= :date", { date: thirtyDaysAgo })
       .getRawOne();
 
+    // Get revenue breakdown by tenant
+    const revenueByTenant = await this.invoiceRepository
+      .createQueryBuilder("invoice")
+      .leftJoin("invoice.tenant", "tenant")
+      .select("tenant.name", "tenantName")
+      .addSelect("SUM(invoice.total_amount)", "totalRevenue")
+      .addSelect("COUNT(invoice.id)", "invoiceCount")
+      .where("invoice.created_at >= :date", { date: thirtyDaysAgo })
+      .groupBy("tenant.id")
+      .addGroupBy("tenant.name")
+      .orderBy("SUM(invoice.total_amount)", "DESC")
+      .getRawMany();
+
     return {
       summary: {
         totalTenants,
@@ -63,6 +123,17 @@ export class SystemService {
         totalRevenueLast30Days: recentRevenue?.total || 0,
       },
       tenants: tenantsWithStats,
+      branches: branchesWithStats,
+      users: usersWithStats,
+      inventoryItems: inventoryWithStats,
+      revenue: {
+        total: recentRevenue?.total || 0,
+        byTenant: revenueByTenant.map((r) => ({
+          tenantName: r.tenantname || r.tenantName,
+          totalRevenue: parseFloat(r.totalrevenue || r.totalRevenue || 0),
+          invoiceCount: parseInt(r.invoicecount || r.invoiceCount || 0),
+        })),
+      },
       recentActivity: {
         recentInvoices: recentInvoices.map((inv) => ({
           id: inv.id,

@@ -1,13 +1,28 @@
 import { AppDataSource } from "../config/data-source";
-import { Tenant } from "../entities/Tenant";
+import { Tenant, SubscriptionStatus } from "../entities/Tenant";
 
 export class TenantService {
   private tenantRepository = AppDataSource.getRepository(Tenant);
 
-  async createTenant(name: string, subscriptionStatus: string = "trial") {
+  async createTenant(
+    name: string,
+    subscriptionStatus: SubscriptionStatus = SubscriptionStatus.TRIAL
+  ) {
+    // Validate subscription status
+    if (
+      subscriptionStatus &&
+      !Object.values(SubscriptionStatus).includes(subscriptionStatus)
+    ) {
+      throw new Error(
+        `Invalid subscription status. Must be one of: ${Object.values(
+          SubscriptionStatus
+        ).join(", ")}`
+      );
+    }
+
     const tenant = this.tenantRepository.create({
       name,
-      subscription_status: subscriptionStatus,
+      subscription_status: subscriptionStatus || SubscriptionStatus.TRIAL,
     });
 
     return await this.tenantRepository.save(tenant);
@@ -36,13 +51,24 @@ export class TenantService {
 
   async updateTenant(
     id: string,
-    data: { name?: string; subscription_status?: string }
+    data: { name?: string; subscription_status?: SubscriptionStatus }
   ) {
     const tenant = await this.getTenantById(id);
 
     if (data.name) tenant.name = data.name;
-    if (data.subscription_status)
+    if (data.subscription_status) {
+      // Validate subscription status
+      if (
+        !Object.values(SubscriptionStatus).includes(data.subscription_status)
+      ) {
+        throw new Error(
+          `Invalid subscription status. Must be one of: ${Object.values(
+            SubscriptionStatus
+          ).join(", ")}`
+        );
+      }
       tenant.subscription_status = data.subscription_status;
+    }
 
     return await this.tenantRepository.save(tenant);
   }

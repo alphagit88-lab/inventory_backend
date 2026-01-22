@@ -45,9 +45,20 @@ export class UserService {
   }
 
   async getUsersByTenant(tenantId: string) {
+    // Only return branch users, not Store Admins
     return await this.userRepository.find({
-      where: { tenant: { id: tenantId } },
-      relations: ["branch"],
+      where: { 
+        tenant: { id: tenantId },
+        role: UserRole.BRANCH_USER
+      },
+      relations: ["branch", "tenant"],
+      order: { email: "ASC" },
+    });
+  }
+
+  async getAllUsers() {
+    return await this.userRepository.find({
+      relations: ["branch", "tenant"],
       order: { email: "ASC" },
     });
   }
