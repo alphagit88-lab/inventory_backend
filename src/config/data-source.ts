@@ -13,15 +13,47 @@ import { StockMovement } from "../entities/StockMovement";
 
 dotenv.config();
 
+// Support both DATABASE_URL (common in cloud platforms) and individual variables
+const getDbConfig = () => {
+  // If DATABASE_URL is provided (Railway, Render, Vercel Postgres, etc.)
+  if (process.env.DATABASE_URL) {
+    try {
+      const url = new URL(process.env.DATABASE_URL);
+      return {
+        host: url.hostname,
+        port: parseInt(url.port) || 5432,
+        username: url.username,
+        password: url.password,
+        database: url.pathname.slice(1), // Remove leading /
+      };
+    } catch (error) {
+      console.error("Error parsing DATABASE_URL:", error);
+      // Fall back to individual variables
+    }
+  }
+  
+  // Use individual environment variables
+  return {
+    host: process.env.DB_HOST || "localhost",
+    port: Number(process.env.DB_PORT) || 5432,
+    username: process.env.DB_USER || "postgres",
+    password: process.env.DB_PASSWORD || "",
+    database: process.env.DB_NAME || "inventory_db",
+  };
+};
+
+const dbConfig = getDbConfig();
+
 export const AppDataSource = new DataSource({
   type: "postgres",
-  host: process.env.DB_HOST,
-  port: Number(process.env.DB_PORT),
-  username: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
+  host: dbConfig.host,
+  port: dbConfig.port,
+  username: dbConfig.username,
+  password: dbConfig.password,
+  database: dbConfig.database,
   synchronize: process.env.NODE_ENV !== "production", // Only sync in dev
   logging: process.env.NODE_ENV === "development",
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false, // Enable SSL in production
   entities: [
     Tenant,
     Branch,
