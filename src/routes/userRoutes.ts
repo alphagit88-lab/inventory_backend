@@ -10,24 +10,24 @@ const userController = new UserController();
 // All routes require authentication
 router.use(authenticate, ensureTenantIsolation);
 
-// Create Branch User - Store Admin and Super Admin only
+// Create Branch User - Store Admin only
 // Support both /users and /users/branch-user for backward compatibility
 router.post(
   "/",
-  authorize(UserRole.STORE_ADMIN, UserRole.SUPER_ADMIN),
+  authorize(UserRole.STORE_ADMIN),
   (req, res) => userController.createBranchUser(req, res)
 );
 
 router.post(
   "/branch-user",
-  authorize(UserRole.STORE_ADMIN, UserRole.SUPER_ADMIN),
+  authorize(UserRole.STORE_ADMIN),
   (req, res) => userController.createBranchUser(req, res)
 );
 
-// Get users by tenant - Store Admin and Super Admin only
+// Get users by tenant - Store Admin only
 router.get(
   "/tenant",
-  authorize(UserRole.STORE_ADMIN, UserRole.SUPER_ADMIN),
+  authorize(UserRole.STORE_ADMIN),
   (req, res) => userController.getByTenant(req, res)
 );
 
@@ -39,17 +39,17 @@ router.get("/branch/:branchId", (req, res) =>
 // Get user by ID
 router.get("/:id", (req, res) => userController.getById(req, res));
 
-// Update user - Store Admin and Super Admin only
+// Update user - Store Admin only
 router.put(
   "/:id",
-  authorize(UserRole.STORE_ADMIN, UserRole.SUPER_ADMIN),
+  authorize(UserRole.STORE_ADMIN),
   (req, res) => userController.update(req, res)
 );
 
-// Delete user - Store Admin and Super Admin only
+// Delete user - Store Admin only
 router.delete(
   "/:id",
-  authorize(UserRole.STORE_ADMIN, UserRole.SUPER_ADMIN),
+  authorize(UserRole.STORE_ADMIN),
   (req, res) => userController.delete(req, res)
 );
 

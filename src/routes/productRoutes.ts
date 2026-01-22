@@ -10,10 +10,10 @@ const productController = new ProductController();
 // All routes require authentication
 router.use(authenticate, ensureTenantIsolation);
 
-// Product routes - Store Admin and Super Admin can manage
+// Product routes - Store Admin only
 router.post(
   "/",
-  authorize(UserRole.STORE_ADMIN, UserRole.SUPER_ADMIN),
+  authorize(UserRole.STORE_ADMIN),
   (req, res) => productController.create(req, res)
 );
 
@@ -25,20 +25,20 @@ router.get("/:id", (req, res) => productController.getById(req, res));
 
 router.put(
   "/:id",
-  authorize(UserRole.STORE_ADMIN, UserRole.SUPER_ADMIN),
+  authorize(UserRole.STORE_ADMIN),
   (req, res) => productController.update(req, res)
 );
 
 router.delete(
   "/:id",
-  authorize(UserRole.STORE_ADMIN, UserRole.SUPER_ADMIN),
+  authorize(UserRole.STORE_ADMIN),
   (req, res) => productController.delete(req, res)
 );
 
 // Variant routes
 router.post(
   "/:productId/variants",
-  authorize(UserRole.STORE_ADMIN, UserRole.SUPER_ADMIN),
+  authorize(UserRole.STORE_ADMIN),
   (req, res) => productController.createVariant(req, res)
 );
 
