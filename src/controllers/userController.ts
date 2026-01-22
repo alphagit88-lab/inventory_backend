@@ -23,13 +23,10 @@ export class UserController {
         return;
       }
 
-      // Only Store Admin and Super Admin can create Branch Users
-      if (
-        req.user?.role !== UserRole.STORE_ADMIN &&
-        req.user?.role !== UserRole.SUPER_ADMIN
-      ) {
+      // Only Store Admin can create Branch Users
+      if (req.user?.role !== UserRole.STORE_ADMIN) {
         res.status(403).json({
-          message: "Only Store Admin and Super Admin can create Branch Users",
+          message: "Only Store Admin can create Branch Users",
         });
         return;
       }
@@ -53,16 +50,14 @@ export class UserController {
     try {
       const tenantId = req.user?.tenantId;
 
+      // Store Admin needs tenantId
       if (!tenantId) {
         res.status(400).json({ message: "Tenant ID is required" });
         return;
       }
 
-      // Only Store Admin and Super Admin can view users
-      if (
-        req.user?.role !== UserRole.STORE_ADMIN &&
-        req.user?.role !== UserRole.SUPER_ADMIN
-      ) {
+      // Only Store Admin can view users
+      if (req.user?.role !== UserRole.STORE_ADMIN) {
         res.status(403).json({
           message: "Insufficient permissions",
         });
@@ -112,11 +107,8 @@ export class UserController {
       const { id } = req.params;
       const { email, branchId } = req.body;
 
-      // Only Store Admin and Super Admin can update users
-      if (
-        req.user?.role !== UserRole.STORE_ADMIN &&
-        req.user?.role !== UserRole.SUPER_ADMIN
-      ) {
+      // Only Store Admin can update users
+      if (req.user?.role !== UserRole.STORE_ADMIN) {
         res.status(403).json({
           message: "Insufficient permissions",
         });
@@ -139,13 +131,29 @@ export class UserController {
     try {
       const { id } = req.params;
 
-      // Only Store Admin and Super Admin can delete users
-      if (
-        req.user?.role !== UserRole.STORE_ADMIN &&
-        req.user?.role !== UserRole.SUPER_ADMIN
-      ) {
+      // Only Store Admin can delete users
+      if (req.user?.role !== UserRole.STORE_ADMIN) {
         res.status(403).json({
           message: "Insufficient permissions",
+        });
+        return;
+      }
+
+      // Prevent Store Admin from deleting themselves
+      if (req.user?.id === id) {
+        res.status(403).json({
+          message: "You cannot delete your own account",
+        });
+        return;
+      }
+
+      // Get the user to check their role
+      const userToDelete = await userService.getUserById(id as string);
+      
+      // Prevent deleting Store Admin accounts (only branch users can be deleted)
+      if (userToDelete.role !== UserRole.BRANCH_USER) {
+        res.status(403).json({
+          message: "Only branch users can be deleted",
         });
         return;
       }

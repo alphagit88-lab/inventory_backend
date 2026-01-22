@@ -1,6 +1,8 @@
 import { Response } from "express";
 import { AuthRequest } from "../middleware/auth";
 import { InvoiceService } from "../services/invoiceService";
+import { AppDataSource } from "../config/data-source";
+import { Branch } from "../entities/Branch";
 
 const invoiceService = new InvoiceService();
 
@@ -8,16 +10,70 @@ export class InvoiceController {
   async create(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { items, taxAmount, changeAmount } = req.body;
-      const tenantId = req.user?.tenantId;
+      let tenantId = req.user?.tenantId;
       const branchId = req.user?.branchId || req.body.branchId;
 
-      if (!tenantId || !branchId) {
-        res.status(400).json({ message: "Tenant ID and Branch ID are required" });
+      // Validate branchId - Branch Users must have a branch assigned
+      if (!branchId) {
+        res.status(400).json({ 
+          message: "Branch ID is required. Please contact your administrator to assign you to a branch." 
+        });
         return;
       }
 
+      // If tenantId is not available from user, get it from the branch
+      if (!tenantId && branchId) {
+        const branchRepository = AppDataSource.getRepository(Branch);
+        const branch = await branchRepository.findOne({
+          where: { id: branchId },
+          relations: ["tenant"],
+        });
+        
+        if (branch && branch.tenant) {
+          tenantId = branch.tenant.id;
+        } else if (!branch) {
+          res.status(400).json({ 
+            message: "Invalid branch ID: Branch not found" 
+          });
+          return;
+        }
+      }
+
+      // Validate tenantId
+      if (!tenantId) {
+        res.status(400).json({ 
+          message: "Tenant ID is required. Please ensure your account is properly configured." 
+        });
+        return;
+      }
+
+      // Validate items
       if (!items || !Array.isArray(items) || items.length === 0) {
         res.status(400).json({ message: "Items array is required and must not be empty" });
+        return;
+      }
+
+      // Validate each item in the array
+      for (const item of items) {
+        if (!item.productVariantId) {
+          res.status(400).json({ 
+            message: "Each item must have a productVariantId" 
+          });
+          return;
+        }
+        if (!item.quantity || item.quantity <= 0) {
+          res.status(400).json({ 
+            message: "Each item must have a valid quantity greater than 0" 
+          });
+          return;
+        }
+      }
+
+      // For Branch Users, ensure they can only create invoices for their own branch
+      if (req.user?.role === "branch_user" && req.user?.branchId !== branchId) {
+        res.status(403).json({ 
+          message: "Access denied: You can only create invoices for your assigned branch." 
+        });
         return;
       }
 
@@ -31,7 +87,11 @@ export class InvoiceController {
 
       res.status(201).json(invoice);
     } catch (error: any) {
-      res.status(400).json({ message: error.message });
+      console.error('Invoice creation error:', error);
+      const statusCode = error.message?.includes('not found') || error.message?.includes('Invalid') ? 404 : 400;
+      res.status(statusCode).json({ 
+        message: error.message || 'Failed to create invoice. Please check your input and try again.' 
+      });
     }
   }
 

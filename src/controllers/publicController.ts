@@ -33,6 +33,7 @@ export class PublicController {
   /**
    * Get branches for a specific tenant (for registration)
    * Returns only id and name (no sensitive data)
+   * Works for ALL tenants regardless of subscription_status (trial, active, suspended)
    */
   async getBranchesForRegistration(req: Request, res: Response): Promise<void> {
     try {
@@ -50,16 +51,22 @@ export class PublicController {
         return;
       }
 
+      // Get branches for tenant - works for all subscription statuses
       const branches = await branchService.getBranchesByTenant(tenantId);
+      
       // Return only minimal data needed for registration
+      // Always return an array, even if empty
       const publicBranches = branches.map((branch) => ({
         id: branch.id,
         name: branch.name,
         address: branch.address,
       }));
+      
+      // Return empty array if no branches found (this is valid - tenant might not have branches yet)
       res.json(publicBranches);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      console.error('Error in getBranchesForRegistration:', error);
+      res.status(500).json({ message: error.message || "Failed to fetch branches" });
     }
   }
 }

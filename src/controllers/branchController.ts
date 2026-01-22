@@ -7,29 +7,17 @@ const branchService = new BranchService();
 export class BranchController {
   async create(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const { name, address, phone, tenantId: tenantIdFromBody } = req.body;
-      const tenantId = tenantIdFromBody || req.user?.tenantId;
-      const userRole = req.user?.role;
+      const { name, address, phone } = req.body;
+      const tenantId = req.user?.tenantId;
 
-      // Super Admin must provide tenantId in request body
-      if (userRole === "super_admin" && !tenantIdFromBody) {
-        res.status(400).json({ message: "Tenant ID is required in request body for Super Admin" });
-        return;
-      }
-
-      // Store Admin uses their own tenantId
-      if (userRole === "store_admin" && !tenantId) {
+      // Only Store Admin can create branches
+      if (!tenantId) {
         res.status(400).json({ message: "Tenant ID is required" });
         return;
       }
 
       if (!name) {
         res.status(400).json({ message: "Name is required" });
-        return;
-      }
-
-      if (!tenantId) {
-        res.status(400).json({ message: "Tenant ID is required" });
         return;
       }
 
@@ -50,16 +38,8 @@ export class BranchController {
   async getByTenant(req: AuthRequest, res: Response): Promise<void> {
     try {
       const tenantId = req.user?.tenantId;
-      const userRole = req.user?.role;
 
-      // Super Admin can see all branches
-      if (userRole === "super_admin") {
-        const allBranches = await branchService.getAllBranches();
-        res.json(allBranches);
-        return;
-      }
-
-      // Store Admin and Branch User need tenantId
+      // Only Store Admin can view branches
       if (!tenantId) {
         res.status(400).json({ message: "Tenant ID is required" });
         return;
