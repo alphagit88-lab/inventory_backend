@@ -9,6 +9,12 @@ import { Branch } from "./Branch";
 import { Product } from "./Product";
 import { User } from "./User";
 
+export enum SubscriptionStatus {
+  TRIAL = "trial",
+  ACTIVE = "active",
+  SUSPENDED = "suspended",
+}
+
 @Entity()
 export class Tenant {
   @PrimaryGeneratedColumn("uuid")
@@ -17,8 +23,12 @@ export class Tenant {
   @Column()
   name: string;
 
-  @Column({ default: "trial" })
-  subscription_status: string;
+  @Column({
+    type: "varchar",
+    default: SubscriptionStatus.TRIAL,
+    enum: SubscriptionStatus,
+  })
+  subscription_status: SubscriptionStatus;
 
   @CreateDateColumn()
   created_at: Date;
