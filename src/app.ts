@@ -17,16 +17,19 @@ const app = express();
 app.set("trust proxy", 1);
 
 // Session configuration
+// Session configuration
+const isProduction = process.env.NODE_ENV === "production";
+
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "your-session-secret-change-in-production",
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: true, // ALWAYS true for cross-site cookies (SameSite=None requires Secure)
+      secure: isProduction, // True in Prod (HTTPS), False in Dev (HTTP)
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: "none", // REQUIRED for cross-domain cookies
+      sameSite: isProduction ? "none" : "lax", // 'none' for cross-site prod, 'lax' for local
     },
   })
 );
