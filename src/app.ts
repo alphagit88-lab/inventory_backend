@@ -33,6 +33,12 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Debug: Log all incoming requests
+app.use((req, res, next) => {
+  console.log(`[REQUEST] ${req.method} ${req.path}`);
+  next();
+});
+
 app.get("/health", (_req, res) => {
   res.json({ status: "OK", message: "Backend is running" });
 });
@@ -55,7 +61,8 @@ if (process.env.NODE_ENV === "development") {
 }
 
 // 404 handler
-app.use((_req, res) => {
+app.use((req, res) => {
+  console.log(`[404] Route not found: ${req.method} ${req.path}`);
   res.status(404).json({ message: "Route not found" });
 });
 

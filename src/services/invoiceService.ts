@@ -92,7 +92,23 @@ export class InvoiceService {
 
       await transactionalEntityManager.save(InvoiceItem, invoiceItems);
 
-      return await this.getInvoiceById(savedInvoice.id);
+      // Fetch the complete invoice with relations inside the transaction
+      const completeInvoice = await transactionalEntityManager.findOne(Invoice, {
+        where: { id: savedInvoice.id },
+        relations: [
+          "tenant",
+          "branch",
+          "items",
+          "items.product_variant",
+          "items.product_variant.product",
+        ],
+      });
+
+      if (!completeInvoice) {
+        throw new Error("Failed to retrieve created invoice");
+      }
+
+      return completeInvoice;
     });
   }
 

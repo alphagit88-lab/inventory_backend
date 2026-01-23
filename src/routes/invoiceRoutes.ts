@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { InvoiceController } from "../controllers/invoiceController";
 import { authenticate, authorize } from "../middleware/auth";
 import { ensureTenantIsolation } from "../middleware/tenantIsolation";
@@ -6,6 +6,12 @@ import { UserRole } from "../entities/User";
 
 const router = Router();
 const invoiceController = new InvoiceController();
+
+// Debug middleware - log all requests to invoice routes
+router.use((req: Request, res: Response, next: NextFunction) => {
+  console.log(`[INVOICE ROUTE] ${req.method} ${req.path} - Body:`, JSON.stringify(req.body));
+  next();
+});
 
 // All routes require authentication
 router.use(authenticate);
@@ -17,19 +23,12 @@ router.post(
   authorize(UserRole.BRANCH_USER),
   ensureTenantIsolation,
   (req, res) => {
-    console.log('POST /api/invoices route hit');
+    console.log('POST /api/invoices route hit - passed all middleware');
     invoiceController.create(req, res);
   }
 );
 
-// View invoice - Store Admin and Branch User only
-router.get(
-  "/:id",
-  authorize(UserRole.STORE_ADMIN, UserRole.BRANCH_USER),
-  ensureTenantIsolation,
-  (req, res) => invoiceController.getById(req, res)
-);
-
+// Get invoices by branch - must come BEFORE /:id
 router.get(
   "/branch/:branchId",
   authorize(UserRole.STORE_ADMIN, UserRole.BRANCH_USER),
@@ -37,6 +36,7 @@ router.get(
   (req, res) => invoiceController.getByBranch(req, res)
 );
 
+// Get all tenant invoices - must come BEFORE /:id
 router.get(
   "/tenant/all",
   authorize(UserRole.STORE_ADMIN),
@@ -44,6 +44,7 @@ router.get(
   (req, res) => invoiceController.getByTenant(req, res)
 );
 
+// Reports routes - must come BEFORE /:id
 router.get(
   "/reports/date-range",
   authorize(UserRole.STORE_ADMIN, UserRole.BRANCH_USER),
@@ -65,12 +66,20 @@ router.get(
   (req, res) => invoiceController.getDailySales(req, res)
 );
 
-// Branch-specific daily sales endpoint for Branch Users
+// Branch-specific daily sales endpoint
 router.get(
   "/branch/:branchId/daily-sales",
   authorize(UserRole.STORE_ADMIN, UserRole.BRANCH_USER),
   ensureTenantIsolation,
   (req, res) => invoiceController.getDailySalesByBranch(req, res)
+);
+
+// View single invoice by ID - must come AFTER all specific routes
+router.get(
+  "/:id",
+  authorize(UserRole.STORE_ADMIN, UserRole.BRANCH_USER),
+  ensureTenantIsolation,
+  (req, res) => invoiceController.getById(req, res)
 );
 
 export default router;

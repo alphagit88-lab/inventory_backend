@@ -28,6 +28,10 @@ export const authenticate = (
   res: Response,
   next: NextFunction
 ): void => {
+  console.log(`[AUTH] Checking session for ${req.method} ${req.path}`);
+  console.log(`[AUTH] Session exists:`, !!req.session);
+  console.log(`[AUTH] Session user:`, req.session?.user ? 'exists' : 'missing');
+  
   // Check if user is in session
   if (req.session && req.session.user) {
     req.user = {
@@ -37,10 +41,12 @@ export const authenticate = (
       tenantId: req.session.user.tenantId ?? null,
       branchId: req.session.user.branchId ?? null,
     };
+    console.log(`[AUTH] User authenticated: ${req.user.email} (${req.user.role})`);
     next();
     return;
   }
 
+  console.log(`[AUTH] Authentication failed - no session user`);
   res.status(401).json({ message: "Authentication required. Please login." });
   return;
 };
