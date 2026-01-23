@@ -51,7 +51,7 @@ export const AppDataSource = new DataSource({
   username: dbConfig.username,
   password: dbConfig.password,
   database: dbConfig.database,
-  synchronize: process.env.NODE_ENV !== "production", // Only sync in dev
+  synchronize: process.env.DB_SYNC === "true" || process.env.NODE_ENV !== "production", // DB_SYNC=true for initial setup
   logging: process.env.NODE_ENV === "development",
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false, // Enable SSL in production
   entities: [
