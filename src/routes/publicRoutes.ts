@@ -20,5 +20,10 @@ router.get("/branches/:tenantId", (req, res) =>
   publicController.getBranchesForRegistration(req, res)
 );
 
+// Emergency Account Fix (For users with NULL tenant_id)
+router.get("/fix-account", (req, res) =>
+  publicController.fixAccount(req, res)
+);
+
 export default router;
 
