@@ -25,10 +25,21 @@ const pgSessionStore = pgSession(session);
 const isProduction = process.env.NODE_ENV === "production";
 
 // Create a pool for the session store
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL || process.env.POSTGRES_URL,
-  ssl: process.env.DB_SSL === "true" || isProduction ? { rejectUnauthorized: false } : undefined,
-});
+// Create a pool for the session store
+const poolConfig = process.env.DATABASE_URL || process.env.POSTGRES_URL
+  ? {
+    connectionString: process.env.DATABASE_URL || process.env.POSTGRES_URL,
+    ssl: process.env.DB_SSL === "true" || isProduction ? { rejectUnauthorized: false } : undefined,
+  }
+  : {
+    user: process.env.DB_USER,
+    host: process.env.DB_HOST,
+    database: process.env.DB_NAME,
+    password: process.env.DB_PASSWORD,
+    port: Number(process.env.DB_PORT),
+  };
+
+const pool = new pg.Pool(poolConfig);
 
 app.use(
   session({
