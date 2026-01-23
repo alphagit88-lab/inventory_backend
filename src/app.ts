@@ -13,6 +13,9 @@ import publicRoutes from "./routes/publicRoutes";
 
 const app = express();
 
+// Trust Vercel Proxy (Required for secure cookies)
+app.set("trust proxy", 1);
+
 // Session configuration
 app.use(
   session({
