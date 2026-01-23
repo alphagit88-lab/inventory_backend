@@ -16,9 +16,12 @@ dotenv.config();
 // Support both DATABASE_URL (common in cloud platforms) and individual variables
 const getDbConfig = () => {
   // If DATABASE_URL is provided (Railway, Render, Vercel Postgres, etc.)
-  if (process.env.DATABASE_URL) {
+  // Support both DATABASE_URL (generic) and POSTGRES_URL (Vercel specific)
+  const connectionUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+
+  if (connectionUrl) {
     try {
-      const url = new URL(process.env.DATABASE_URL);
+      const url = new URL(connectionUrl);
       return {
         host: url.hostname,
         port: parseInt(url.port) || 5432,
