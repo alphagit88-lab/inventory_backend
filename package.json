@@ -16,8 +16,16 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/connect-pg-simple": "^7.0.3",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/express-session": "^1.18.2",
+    "@types/node": "^25.0.8",
+    "@types/pg": "^8.16.0",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
+    "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
@@ -26,11 +34,6 @@
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
     "typeorm": "^0.3.28",
-    "@types/bcryptjs": "^2.4.6",
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6",
-    "@types/express-session": "^1.18.2",
-    "@types/node": "^25.0.8",
     "typescript": "^5.9.3"
   },
   "devDependencies": {

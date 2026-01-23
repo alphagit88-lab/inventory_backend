@@ -18,10 +18,25 @@ app.set("trust proxy", 1);
 
 // Session configuration
 // Session configuration
+import pgSession from "connect-pg-simple";
+import pg from "pg";
+
+const pgSessionStore = pgSession(session);
 const isProduction = process.env.NODE_ENV === "production";
+
+// Create a pool for the session store
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL || process.env.POSTGRES_URL,
+  ssl: process.env.DB_SSL === "true" || isProduction ? { rejectUnauthorized: false } : undefined,
+});
 
 app.use(
   session({
+    store: new pgSessionStore({
+      pool: pool,
+      createTableIfMissing: true,
+      tableName: 'user_sessions' // custom table name to avoid conflicts
+    }),
     secret: process.env.SESSION_SECRET || "your-session-secret-change-in-production",
     resave: false,
     saveUninitialized: false,
@@ -29,7 +44,7 @@ app.use(
       secure: isProduction, // True in Prod (HTTPS), False in Dev (HTTP)
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: isProduction ? "none" : "lax", // 'none' for cross-site prod, 'lax' for local
+      sameSite: isProduction ? "none" : "lax",
     },
   })
 );
