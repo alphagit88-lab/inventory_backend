@@ -31,7 +31,7 @@ const getDbConfig = () => {
       // Fall back to individual variables
     }
   }
-  
+
   // Use individual environment variables
   return {
     host: process.env.DB_HOST || "localhost",
@@ -53,7 +53,7 @@ export const AppDataSource = new DataSource({
   database: dbConfig.database,
   synchronize: process.env.DB_SYNC === "true" || process.env.NODE_ENV !== "production", // DB_SYNC=true for initial setup
   logging: process.env.NODE_ENV === "development",
-  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false, // Enable SSL in production
+  ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false, // Only enable SSL if DB_SSL=true
   entities: [
     Tenant,
     Branch,
