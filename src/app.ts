@@ -47,9 +47,6 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
 }));
 
-// Handle preflight requests
-app.options('*', cors());
-
 // Session configuration
 import pgSession from "connect-pg-simple";
 import pg from "pg";
