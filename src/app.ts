@@ -16,7 +16,40 @@ const app = express();
 // Trust Vercel Proxy (Required for secure cookies)
 app.set("trust proxy", 1);
 
-// Session configuration
+// Enhanced CORS configuration - MUST be before session middleware
+const allowedOrigins = [
+  process.env.FRONTEND_URL || "http://localhost:3000",
+  "https://inventory-frontend-tau-six.vercel.app",
+  "http://localhost:3000"
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    // Check if origin is in allowed list
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // Also allow any Vercel preview deployments
+    if (origin.endsWith('.vercel.app')) {
+      return callback(null, true);
+    }
+
+    console.log(`[CORS] Blocked origin: ${origin}`);
+    // Allow all for now to debug
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+}));
+
+// Handle preflight requests
+app.options('*', cors());
+
 // Session configuration
 import pgSession from "connect-pg-simple";
 import pg from "pg";
@@ -24,7 +57,6 @@ import pg from "pg";
 const pgSessionStore = pgSession(session);
 const isProduction = process.env.NODE_ENV === "production";
 
-// Create a pool for the session store
 // Create a pool for the session store
 const poolConfig = process.env.DATABASE_URL || process.env.POSTGRES_URL
   ? {
@@ -46,46 +78,20 @@ app.use(
     store: new pgSessionStore({
       pool: pool,
       createTableIfMissing: true,
-      tableName: 'user_sessions' // custom table name to avoid conflicts
+      tableName: 'user_sessions'
     }),
     secret: process.env.SESSION_SECRET || "your-session-secret-change-in-production",
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: isProduction, // True in Prod (HTTPS), False in Dev (HTTP)
+      secure: isProduction,
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      maxAge: 24 * 60 * 60 * 1000,
       sameSite: isProduction ? "none" : "lax",
     },
   })
 );
 
-// Enhanced CORS configuration
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-
-    const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:3000";
-
-    // Check if origin matches allowed origin exactly
-    if (origin === allowedOrigin) {
-      return callback(null, true);
-    }
-
-    // Also allow Vercel preview deployments (optional, good for testing)
-    if (origin.endsWith('.vercel.app')) {
-      return callback(null, true);
-    }
-
-    console.log(`[CORS] Blocked origin: ${origin}. Expected: ${allowedOrigin}`);
-    // For now, let's be permissive to fix the user's issue, or return error
-    // callback(new Error('Not allowed by CORS'));
-    // RELAXING CORS FOR DEBUGGING:
-    return callback(null, true);
-  },
-  credentials: true,
-}));
 app.use(express.json());
 
 // Debug: Log all incoming requests
