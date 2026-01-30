@@ -3,19 +3,19 @@ import { validate as isUUID } from "uuid";
 import { AppDataSource } from "../config/data-source";
 import { User, UserRole } from "../entities/User";
 import { Tenant } from "../entities/Tenant";
-import { Branch } from "../entities/Branch";
+import { Location } from "../entities/Location";
 
 export class AuthService {
   private userRepository = AppDataSource.getRepository(User);
   private tenantRepository = AppDataSource.getRepository(Tenant);
-  private branchRepository = AppDataSource.getRepository(Branch);
+  private locationRepository = AppDataSource.getRepository(Location);
 
   async register(
     email: string,
     password: string,
     role: UserRole,
     tenantId?: string,
-    branchId?: string
+    locationId?: string
   ) {
     const existingUser = await this.userRepository.findOne({
       where: { email },
@@ -38,21 +38,21 @@ export class AuthService {
       }
     }
 
-    // Validate branchId if provided
-    if (branchId) {
-      if (!isUUID(branchId)) {
-        throw new Error("Invalid branch ID format (must be UUID)");
+    // Validate locationId if provided
+    if (locationId) {
+      if (!isUUID(locationId)) {
+        throw new Error("Invalid location ID format (must be UUID)");
       }
-      const branch = await this.branchRepository.findOne({
-        where: { id: branchId },
+      const location = await this.locationRepository.findOne({
+        where: { id: locationId },
         relations: ["tenant"],
       });
-      if (!branch) {
-        throw new Error("Invalid branch ID: Branch not found");
+      if (!location) {
+        throw new Error("Invalid location ID: Location not found");
       }
-      // If tenantId is also provided, verify branch belongs to tenant
-      if (tenantId && branch.tenant.id !== tenantId) {
-        throw new Error("Branch does not belong to the specified tenant");
+      // If tenantId is also provided, verify location belongs to tenant
+      if (tenantId && location.tenant.id !== tenantId) {
+        throw new Error("Location does not belong to the specified tenant");
       }
     }
 
@@ -61,12 +61,12 @@ export class AuthService {
       throw new Error("Tenant ID is required for Store Admin role");
     }
 
-    if (role === UserRole.BRANCH_USER) {
+    if (role === UserRole.LOCATION_USER) {
       if (!tenantId) {
-        throw new Error("Tenant ID is required for Branch User role");
+        throw new Error("Tenant ID is required for Location User role");
       }
-      if (!branchId) {
-        throw new Error("Branch ID is required for Branch User role");
+      if (!locationId) {
+        throw new Error("Location ID is required for Location User role");
       }
     }
 
@@ -77,7 +77,7 @@ export class AuthService {
       password_hash: hashedPassword,
       role,
       tenant: tenantId ? { id: tenantId } : undefined,
-      branch: branchId ? { id: branchId } : undefined,
+      location: locationId ? { id: locationId } : undefined,
     });
 
     await this.userRepository.save(user);
@@ -94,7 +94,7 @@ export class AuthService {
   async login(email: string, password: string) {
     const user = await this.userRepository.findOne({
       where: { email },
-      relations: ["tenant", "branch"],
+      relations: ["tenant", "location"],
     });
 
     if (!user) {
@@ -107,13 +107,18 @@ export class AuthService {
       throw new Error("Invalid credentials");
     }
 
+    // Check if user is active
+    if (user.isActive === false) {
+      throw new Error("Your account has been deactivated. Please contact your administrator.");
+    }
+
     return {
       user: {
         id: user.id,
         email: user.email,
         role: user.role,
         tenantId: user.tenant?.id || null,
-        branchId: user.branch?.id || null,
+        locationId: user.location?.id || null,
       },
     };
   }

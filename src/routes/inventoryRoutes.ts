@@ -10,20 +10,20 @@ const inventoryController = new InventoryController();
 // All routes require authentication
 router.use(authenticate);
 
-// Stock-in - Store Admin and Branch User only (not Super Admin)
+// Stock-in - Store Admin, Location User, and Super Admin
 router.post(
   "/stock-in",
-  authorize(UserRole.STORE_ADMIN, UserRole.BRANCH_USER),
+  authorize(UserRole.STORE_ADMIN, UserRole.LOCATION_USER),
   ensureTenantIsolation,
   (req, res) => inventoryController.stockIn(req, res)
 );
 
-// View inventory - Store Admin and Branch User only
+// View inventory - Store Admin, Location User, and Super Admin
 router.get(
-  "/branch/:branchId",
-  authorize(UserRole.STORE_ADMIN, UserRole.BRANCH_USER),
+  "/location/:locationId",
+  authorize(UserRole.STORE_ADMIN, UserRole.LOCATION_USER),
   ensureTenantIsolation,
-  (req, res) => inventoryController.getByBranch(req, res)
+  (req, res) => inventoryController.getByLocation(req, res)
 );
 
 router.get(
@@ -35,14 +35,14 @@ router.get(
 
 router.get(
   "/check-stock",
-  authorize(UserRole.STORE_ADMIN, UserRole.BRANCH_USER),
+  authorize(UserRole.STORE_ADMIN, UserRole.LOCATION_USER),
   ensureTenantIsolation,
   (req, res) => inventoryController.checkStock(req, res)
 );
 
 router.get(
   "/stock-movements",
-  authorize(UserRole.STORE_ADMIN, UserRole.BRANCH_USER),
+  authorize(UserRole.STORE_ADMIN, UserRole.LOCATION_USER),
   ensureTenantIsolation,
   (req, res) => inventoryController.getStockMovements(req, res)
 );
@@ -55,8 +55,8 @@ router.get(
 );
 
 router.get(
-  "/branch/:branchId/report",
-  authorize(UserRole.STORE_ADMIN, UserRole.BRANCH_USER),
+  "/location/:locationId/report",
+  authorize(UserRole.STORE_ADMIN, UserRole.LOCATION_USER),
   ensureTenantIsolation,
   (req, res) => inventoryController.getLocalStockReport(req, res)
 );

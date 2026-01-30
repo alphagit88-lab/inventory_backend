@@ -3,7 +3,7 @@ import cors from "cors";
 import session from "express-session";
 import authRoutes from "./routes/authRoutes";
 import tenantRoutes from "./routes/tenantRoutes";
-import branchRoutes from "./routes/branchRoutes";
+import locationRoutes from "./routes/locationRoutes";
 import productRoutes from "./routes/productRoutes";
 import inventoryRoutes from "./routes/inventoryRoutes";
 import invoiceRoutes from "./routes/invoiceRoutes";
@@ -102,7 +102,7 @@ app.get("/health", (_req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/public", publicRoutes); // Public routes for registration
 app.use("/api/tenants", tenantRoutes);
-app.use("/api/branches", branchRoutes);
+app.use("/api/locations", locationRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/invoices", invoiceRoutes);
@@ -112,7 +112,7 @@ app.use("/api/system", systemRoutes);
 // Debug: Log all registered routes (development only)
 if (process.env.NODE_ENV === "development") {
   console.log("Registered API routes:");
-  console.log("  POST /api/invoices - Create invoice (Branch User only)");
+  console.log("  POST /api/invoices - Create invoice (Location User only)");
 }
 
 // 404 handler

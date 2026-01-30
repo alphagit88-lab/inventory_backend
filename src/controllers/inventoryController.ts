@@ -10,7 +10,7 @@ export class InventoryController {
       const { productVariantId, quantity, costPrice, sellingPrice, supplier } =
         req.body;
       const tenantId = req.user?.tenantId;
-      const branchId = req.user?.branchId || req.body.branchId;
+      const locationId = req.user?.locationId || req.body.locationId;
 
       // Super Admin can provide tenantId in body if needed
       const finalTenantId = tenantId || req.body.tenantId;
@@ -22,9 +22,9 @@ export class InventoryController {
         return;
       }
 
-      if (!branchId) {
+      if (!locationId) {
         res.status(400).json({
-          message: "Branch ID is required",
+          message: "Location ID is required",
         });
         return;
       }
@@ -59,7 +59,7 @@ export class InventoryController {
 
       const inventory = await inventoryService.stockIn(
         finalTenantId,
-        branchId,
+        locationId,
         productVariantId,
         quantity,
         costPrice,
@@ -76,16 +76,16 @@ export class InventoryController {
     }
   }
 
-  async getByBranch(req: AuthRequest, res: Response): Promise<void> {
+  async getByLocation(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const branchId = req.user?.branchId || req.params.branchId;
+      const locationId = req.user?.locationId || req.params.locationId;
 
-      if (!branchId) {
-        res.status(400).json({ message: "Branch ID is required" });
+      if (!locationId) {
+        res.status(400).json({ message: "Location ID is required" });
         return;
       }
 
-      const inventory = await inventoryService.getInventoryByBranch(branchId as string);
+      const inventory = await inventoryService.getInventoryByLocation(locationId as string);
       res.json(inventory);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -94,7 +94,17 @@ export class InventoryController {
 
   async getByTenant(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const tenantId = req.user?.tenantId;
+      // Super Admin can provide tenantId in query params, others use from session
+      const tenantId = req.user?.role === "super_admin"
+        ? (req.query.tenantId as string || req.user?.tenantId)
+        : req.user?.tenantId;
+
+      // For super admin without context, return all inventory
+      if (req.user?.role === "super_admin" && !tenantId) {
+        const inventory = await inventoryService.getAllInventory();
+        res.json(inventory);
+        return;
+      }
 
       if (!tenantId) {
         res.status(400).json({ message: "Tenant ID is required" });
@@ -110,17 +120,17 @@ export class InventoryController {
 
   async checkStock(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const { branchId, productVariantId } = req.query;
+      const { locationId, productVariantId } = req.query;
 
-      if (!branchId || !productVariantId) {
+      if (!locationId || !productVariantId) {
         res.status(400).json({
-          message: "Branch ID and Product Variant ID are required",
+          message: "Location ID and Product Variant ID are required",
         });
         return;
       }
 
       const stock = await inventoryService.checkStock(
-        branchId as string,
+        locationId as string,
         productVariantId as string
       );
 
@@ -132,7 +142,7 @@ export class InventoryController {
 
   async getStockMovements(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const branchId = req.user?.branchId || req.query.branchId;
+      const locationId = req.user?.locationId || req.query.locationId;
       const productVariantId = req.query.productVariantId as string | undefined;
       const startDate = req.query.startDate
         ? new Date(req.query.startDate as string)
@@ -141,13 +151,13 @@ export class InventoryController {
         ? new Date(req.query.endDate as string)
         : undefined;
 
-      if (!branchId) {
-        res.status(400).json({ message: "Branch ID is required" });
+      if (!locationId) {
+        res.status(400).json({ message: "Location ID is required" });
         return;
       }
 
       const movements = await inventoryService.getStockMovements(
-        branchId as string,
+        locationId as string,
         productVariantId,
         startDate,
         endDate
@@ -162,7 +172,7 @@ export class InventoryController {
   async getStockStatus(req: AuthRequest, res: Response): Promise<void> {
     try {
       const tenantId = req.user?.tenantId;
-      const { branchId, size, category, brand } = req.query;
+      const { locationId, size, category, brand } = req.query;
 
       if (!tenantId) {
         res.status(400).json({ message: "Tenant ID is required" });
@@ -171,7 +181,7 @@ export class InventoryController {
 
       const status = await inventoryService.getStockStatus(
         tenantId,
-        branchId as string | undefined,
+        locationId as string | undefined,
         size as string | undefined,
         category as string | undefined,
         brand as string | undefined
@@ -185,15 +195,15 @@ export class InventoryController {
 
   async getLocalStockReport(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const branchId = req.user?.branchId || req.params.branchId;
+      const locationId = req.user?.locationId || req.params.locationId;
 
-      if (!branchId) {
-        res.status(400).json({ message: "Branch ID is required" });
+      if (!locationId) {
+        res.status(400).json({ message: "Location ID is required" });
         return;
       }
 
       const report = await inventoryService.getLocalStockReport(
-        branchId as string
+        locationId as string
       );
 
       res.json(report);

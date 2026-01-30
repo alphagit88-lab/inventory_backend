@@ -7,11 +7,11 @@ import {
   JoinColumn,
 } from "typeorm";
 import { Tenant } from "./Tenant";
-import { Branch } from "./Branch";
+import { Location } from "./Location";
 import { ProductVariant } from "./ProductVariant";
 
 @Entity()
-@Unique(["branch", "product_variant"])
+@Unique(["location", "product_variant"])
 export class Inventory {
   @PrimaryGeneratedColumn("uuid")
   id: string;
@@ -20,11 +20,11 @@ export class Inventory {
   @JoinColumn({ name: "tenant_id" })
   tenant: Tenant;
 
-  @ManyToOne(() => Branch, (branch) => branch.inventory, {
+  @ManyToOne(() => Location, (location) => location.inventory, {
     onDelete: "CASCADE",
   })
   @JoinColumn({ name: "branch_id" })
-  branch: Branch;
+  location: Location;
 
   @ManyToOne(() => ProductVariant, (variant) => variant.inventory, {
     onDelete: "CASCADE",

@@ -39,7 +39,7 @@ export class TenantService {
   async getTenantById(id: string) {
     const tenant = await this.tenantRepository.findOne({
       where: { id },
-      relations: ["branches", "users", "products"],
+      relations: ["locations", "users", "products"],
     });
 
     if (!tenant) {

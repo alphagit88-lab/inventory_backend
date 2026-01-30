@@ -6,12 +6,12 @@ import {
   JoinColumn,
 } from "typeorm";
 import { Tenant } from "./Tenant";
-import { Branch } from "./Branch";
+import { Location } from "./Location";
 
 export enum UserRole {
   SUPER_ADMIN = "super_admin",
   STORE_ADMIN = "store_admin",
-  BRANCH_USER = "branch_user",
+  LOCATION_USER = "location_user",
 }
 
 @Entity()
@@ -23,12 +23,12 @@ export class User {
   @JoinColumn({ name: "tenant_id" })
   tenant: Tenant;
 
-  @ManyToOne(() => Branch, (branch) => branch.users, {
+  @ManyToOne(() => Location, (location) => location.users, {
     nullable: true,
     onDelete: "SET NULL",
   })
   @JoinColumn({ name: "branch_id" })
-  branch: Branch;
+  location: Location;
 
   @Column({
     type: "varchar",
@@ -41,4 +41,7 @@ export class User {
 
   @Column({ type: "text" })
   password_hash: string;
+
+  @Column({ type: "boolean", default: true })
+  isActive: boolean;
 }

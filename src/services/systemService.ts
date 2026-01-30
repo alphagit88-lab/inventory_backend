@@ -1,13 +1,13 @@
 import { AppDataSource } from "../config/data-source";
 import { Tenant } from "../entities/Tenant";
-import { Branch } from "../entities/Branch";
+import { Location } from "../entities/Location";
 import { User } from "../entities/User";
 import { Invoice } from "../entities/Invoice";
 import { Inventory } from "../entities/Inventory";
 
 export class SystemService {
   private tenantRepository = AppDataSource.getRepository(Tenant);
-  private branchRepository = AppDataSource.getRepository(Branch);
+  private locationRepository = AppDataSource.getRepository(Location);
   private userRepository = AppDataSource.getRepository(User);
   private invoiceRepository = AppDataSource.getRepository(Invoice);
   private inventoryRepository = AppDataSource.getRepository(Inventory);
@@ -15,25 +15,25 @@ export class SystemService {
   async getSystemOverview() {
     const [
       totalTenants,
-      totalBranches,
+      totalLocations,
       totalUsers,
       recentInvoices,
       totalInventoryItems,
     ] = await Promise.all([
       this.tenantRepository.count(),
-      this.branchRepository.count(),
+      this.locationRepository.count(),
       this.userRepository.count(),
       this.invoiceRepository.find({
         take: 10,
         order: { created_at: "DESC" },
-        relations: ["tenant", "branch"],
+        relations: ["tenant", "location"],
       }),
       this.inventoryRepository.count(),
     ]);
 
-    // Get tenants with branch counts
+    // Get tenants with location counts
     const tenants = await this.tenantRepository.find({
-      relations: ["branches"],
+      relations: ["locations"],
     });
 
     const tenantsWithStats = tenants.map((tenant) => ({
@@ -41,27 +41,27 @@ export class SystemService {
       name: tenant.name,
       subscriptionStatus: tenant.subscription_status,
       createdAt: tenant.created_at,
-      branchCount: tenant.branches.length,
+      locationCount: tenant.locations.length,
     }));
 
-    // Get all branches with tenant info
-    const branches = await this.branchRepository.find({
+    // Get all locations with tenant info
+    const locations = await this.locationRepository.find({
       relations: ["tenant"],
       order: { name: "ASC" },
     });
 
-    const branchesWithStats = branches.map((branch) => ({
-      id: branch.id,
-      name: branch.name,
-      address: branch.address,
-      phone: branch.phone,
-      tenantName: branch.tenant.name,
-      tenantId: branch.tenant.id,
+    const locationsWithStats = locations.map((location) => ({
+      id: location.id,
+      name: location.name,
+      address: location.address,
+      phone: location.phone,
+      tenantName: location.tenant.name,
+      tenantId: location.tenant.id,
     }));
 
-    // Get all users with tenant and branch info
+    // Get all users with tenant and location info
     const users = await this.userRepository.find({
-      relations: ["tenant", "branch"],
+      relations: ["tenant", "location"],
       order: { email: "ASC" },
     });
 
@@ -70,25 +70,24 @@ export class SystemService {
       email: user.email,
       role: user.role,
       tenantName: user.tenant?.name || null,
-      branchName: user.branch?.name || null,
+      locationName: user.location?.name || null,
     }));
 
-    // Get inventory items with product and branch info
+    // Get inventory items with product and location info
     const inventoryItems = await this.inventoryRepository.find({
-      relations: ["product_variant", "product_variant.product", "branch", "branch.tenant"],
+      relations: ["product_variant", "product_variant.product", "location", "location.tenant"],
       take: 100, // Limit to 100 items
     });
 
     const inventoryWithStats = inventoryItems.map((item) => ({
       id: item.id,
       productName: item.product_variant?.product?.name || "Unknown",
-      brand: item.product_variant?.brand || "N/A",
-      size: item.product_variant?.size || "N/A",
+      variantName: item.product_variant?.variant_name || "N/A",
       quantity: item.quantity,
       costPrice: item.cost_price,
       sellingPrice: item.selling_price,
-      branchName: item.branch?.name || "Unknown",
-      tenantName: item.branch?.tenant?.name || "Unknown",
+      locationName: item.location?.name || "Unknown",
+      tenantName: item.location?.tenant?.name || "Unknown",
     }));
 
     // Calculate total revenue (last 30 days)
@@ -114,22 +113,44 @@ export class SystemService {
       .orderBy("SUM(invoice.total_amount)", "DESC")
       .getRawMany();
 
+    // Get revenue breakdown by location
+    const revenueByLocation = await this.invoiceRepository
+      .createQueryBuilder("invoice")
+      .leftJoin("invoice.location", "location")
+      .leftJoin("location.tenant", "tenant")
+      .select("location.name", "locationName")
+      .addSelect("tenant.name", "tenantName")
+      .addSelect("SUM(invoice.total_amount)", "totalRevenue")
+      .addSelect("COUNT(invoice.id)", "invoiceCount")
+      .where("invoice.created_at >= :date", { date: thirtyDaysAgo })
+      .groupBy("location.id")
+      .addGroupBy("location.name")
+      .addGroupBy("tenant.name")
+      .orderBy("SUM(invoice.total_amount)", "DESC")
+      .getRawMany();
+
     return {
       summary: {
         totalTenants,
-        totalBranches,
+        totalLocations,
         totalUsers,
         totalInventoryItems,
         totalRevenueLast30Days: recentRevenue?.total || 0,
       },
       tenants: tenantsWithStats,
-      branches: branchesWithStats,
+      locations: locationsWithStats,
       users: usersWithStats,
       inventoryItems: inventoryWithStats,
       revenue: {
         total: recentRevenue?.total || 0,
         byTenant: revenueByTenant.map((r) => ({
           tenantName: r.tenantname || r.tenantName,
+          totalRevenue: parseFloat(r.totalrevenue || r.totalRevenue || 0),
+          invoiceCount: parseInt(r.invoicecount || r.invoiceCount || 0),
+        })),
+        byLocation: revenueByLocation.map((r) => ({
+          tenantName: r.tenantname || r.tenantName,
+          locationName: r.locationname || r.locationName,
           totalRevenue: parseFloat(r.totalrevenue || r.totalRevenue || 0),
           invoiceCount: parseInt(r.invoicecount || r.invoiceCount || 0),
         })),
@@ -140,7 +161,7 @@ export class SystemService {
           invoiceNumber: inv.invoice_number,
           totalAmount: inv.total_amount,
           tenantName: inv.tenant.name,
-          branchName: inv.branch.name,
+          locationName: inv.location.name,
           createdAt: inv.created_at,
         })),
       },

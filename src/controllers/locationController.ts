@@ -1,11 +1,11 @@
 import { Response } from "express";
 import { AuthRequest } from "../middleware/auth";
-import { BranchService } from "../services/branchService";
+import { LocationService } from "../services/locationService";
 import { UserRole } from "../entities/User";
 
-const branchService = new BranchService();
+const locationService = new LocationService();
 
-export class BranchController {
+export class LocationController {
   async create(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { name, address, phone, tenantId: bodyTenantId } = req.body;
@@ -27,16 +27,16 @@ export class BranchController {
         return;
       }
 
-      const branch = await branchService.createBranch(
+      const location = await locationService.createLocation(
         tenantId,
         name,
         address,
         phone
       );
 
-      res.status(201).json(branch);
+      res.status(201).json(location);
     } catch (error: any) {
-      console.error("Error in create branch:", error);
+      console.error("Error in create location:", error);
       res.status(400).json({ message: error.message });
     }
   }
@@ -48,10 +48,10 @@ export class BranchController {
         ? (req.query.tenantId as string || req.user?.tenantId)
         : req.user?.tenantId;
 
-      // Super Admin without tenantId gets all branches across all tenants
-      if (!tenantId && req.user?.role === UserRole.SUPER_ADMIN) {
-        const branches = await branchService.getAllBranches();
-        res.json(branches);
+      // For super admin without context, return all locations
+      if (req.user?.role === UserRole.SUPER_ADMIN && !tenantId) {
+        const locations = await locationService.getAllLocations();
+        res.json(locations);
         return;
       }
 
@@ -60,8 +60,8 @@ export class BranchController {
         return;
       }
 
-      const branches = await branchService.getBranchesByTenant(tenantId);
-      res.json(branches);
+      const locations = await locationService.getLocationsByTenant(tenantId);
+      res.json(locations);
     } catch (error: any) {
       console.error("Error in getByTenant:", error);
       res.status(500).json({ message: error.message || "Internal server error" });
@@ -71,8 +71,8 @@ export class BranchController {
   async getById(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      const branch = await branchService.getBranchById(id as string);
-      res.json(branch);
+      const location = await locationService.getLocationById(id as string);
+      res.json(location);
     } catch (error: any) {
       res.status(404).json({ message: error.message });
     }
@@ -83,8 +83,8 @@ export class BranchController {
       const { id } = req.params;
       const data = req.body;
 
-      const branch = await branchService.updateBranch(id as string, data);
-      res.json(branch);
+      const location = await locationService.updateLocation(id as string, data);
+      res.json(location);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
@@ -93,8 +93,8 @@ export class BranchController {
   async delete(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      await branchService.deleteBranch(id as string);
-      res.json({ message: "Branch deleted successfully" });
+      await locationService.deleteLocation(id as string);
+      res.json({ message: "Location deleted successfully" });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
@@ -109,8 +109,8 @@ export class BranchController {
         return;
       }
 
-      const branches = await branchService.getBranchesByTenant(tenantId as string);
-      res.json(branches);
+      const locations = await locationService.getLocationsByTenant(tenantId as string);
+      res.json(locations);
     } catch (error: any) {
       console.error("Error in getAllByTenantId:", error);
       res.status(500).json({ message: error.message || "Internal server error" });

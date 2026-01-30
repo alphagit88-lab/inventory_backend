@@ -10,20 +10,21 @@ export class InvoiceService {
 
   async createInvoice(
     tenantId: string,
-    branchId: string,
+    locationId: string,
     items: Array<{
       productVariantId: string;
       quantity: number;
     }>,
     taxAmount?: number,
-    changeAmount?: number
+    changeAmount?: number,
+    customerName?: string
   ) {
     // Start transaction
     return await AppDataSource.transaction(async (transactionalEntityManager) => {
       // Validate stock availability for all items
       for (const item of items) {
         const stock = await this.inventoryService.checkStock(
-          branchId,
+          locationId,
           item.productVariantId
         );
 
@@ -43,18 +44,22 @@ export class InvoiceService {
 
       for (const item of items) {
         const stock = await this.inventoryService.checkStock(
-          branchId,
+          locationId,
           item.productVariantId
         );
 
-        const subtotal = Number(stock.sellingPrice) * item.quantity;
+        // Use discounted price if available, otherwise use selling price
+        const unitPrice = stock.discountedPrice ?? Number(stock.sellingPrice);
+        const subtotal = unitPrice * item.quantity;
         totalAmount += subtotal;
 
         const invoiceItem = transactionalEntityManager.create(InvoiceItem, {
           product_variant: { id: item.productVariantId } as any,
           quantity: item.quantity,
-          unit_price: stock.sellingPrice,
+          unit_price: unitPrice,
           cost_price: stock.costPrice,
+          discount: stock.discount ?? 0,
+          original_price: Number(stock.sellingPrice),
           subtotal,
         });
 
@@ -64,14 +69,16 @@ export class InvoiceService {
         // We'll pass the invoice ID after it's saved
       }
 
-      const invoice = transactionalEntityManager.create(Invoice, {
-        tenant: { id: tenantId },
-        branch: { id: branchId },
-        invoice_number: invoiceNumber,
-        total_amount: totalAmount + (taxAmount || 0),
-        tax_amount: taxAmount || 0,
-        change_amount: changeAmount ?? null,
-      });
+      const invoice = new Invoice();
+      invoice.tenant = { id: tenantId } as any;
+      invoice.location = { id: locationId } as any;
+      invoice.invoice_number = invoiceNumber;
+      if (customerName) {
+        invoice.customer_name = customerName;
+      }
+      invoice.total_amount = totalAmount + (taxAmount || 0);
+      invoice.tax_amount = taxAmount || 0;
+      invoice.change_amount = changeAmount ?? null;
 
       const savedInvoice = await transactionalEntityManager.save(Invoice, invoice);
 
@@ -83,7 +90,7 @@ export class InvoiceService {
         // Deduct stock with invoice reference
         await this.inventoryService.deductStock(
           tenantId,
-          branchId,
+          locationId,
           items[i].productVariantId,
           items[i].quantity,
           savedInvoice.id
@@ -97,7 +104,7 @@ export class InvoiceService {
         where: { id: savedInvoice.id },
         relations: [
           "tenant",
-          "branch",
+          "location",
           "items",
           "items.product_variant",
           "items.product_variant.product",
@@ -117,7 +124,7 @@ export class InvoiceService {
       where: { id },
       relations: [
         "tenant",
-        "branch",
+        "location",
         "items",
         "items.product_variant",
         "items.product_variant.product",
@@ -131,10 +138,10 @@ export class InvoiceService {
     return invoice;
   }
 
-  async getInvoicesByBranch(branchId: string) {
+  async getInvoicesByLocation(locationId: string) {
     return await this.invoiceRepository.find({
-      where: { branch: { id: branchId } },
-      relations: ["items", "items.product_variant"],
+      where: { location: { id: locationId } },
+      relations: ["items", "items.product_variant", "items.product_variant.product"],
       order: { created_at: "DESC" },
     });
   }
@@ -142,19 +149,26 @@ export class InvoiceService {
   async getInvoicesByTenant(tenantId: string) {
     return await this.invoiceRepository.find({
       where: { tenant: { id: tenantId } },
-      relations: ["branch", "items"],
+      relations: ["location", "items", "items.product_variant", "items.product_variant.product"],
+      order: { created_at: "DESC" },
+    });
+  }
+
+  async getAllInvoices() {
+    return await this.invoiceRepository.find({
+      relations: ["tenant", "location", "items", "items.product_variant", "items.product_variant.product"],
       order: { created_at: "DESC" },
     });
   }
 
   async getInvoicesByDateRange(
-    branchId: string,
+    locationId: string,
     startDate: Date,
     endDate: Date
   ) {
     return await this.invoiceRepository
       .createQueryBuilder("invoice")
-      .where("invoice.branch_id = :branchId", { branchId })
+      .where("invoice.branch_id = :locationId", { locationId })
       .andWhere("invoice.created_at BETWEEN :startDate AND :endDate", {
         startDate,
         endDate,
@@ -166,9 +180,9 @@ export class InvoiceService {
       .getMany();
   }
 
-  async calculateProfit(branchId: string, startDate: Date, endDate: Date) {
+  async calculateProfit(locationId: string, startDate: Date, endDate: Date) {
     const invoices = await this.getInvoicesByDateRange(
-      branchId,
+      locationId,
       startDate,
       endDate
     );

@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 import { TenantService } from "../services/tenantService";
-import { BranchService } from "../services/branchService";
+import { LocationService } from "../services/locationService";
 
 const tenantService = new TenantService();
-const branchService = new BranchService();
+const locationService = new LocationService();
 
 /**
  * Public controller for registration-related endpoints
@@ -31,7 +31,7 @@ export class PublicController {
   }
 
   /**
-   * Get branches for a specific tenant (for registration)
+   * Get locations for a specific tenant (for registration)
    * Returns only id and name (no sensitive data)
    * Works for ALL tenants regardless of subscription_status (trial, active, suspended)
    */
@@ -51,22 +51,22 @@ export class PublicController {
         return;
       }
 
-      // Get branches for tenant - works for all subscription statuses
-      const branches = await branchService.getBranchesByTenant(tenantId);
+      // Get locations for tenant - works for all subscription statuses
+      const locations = await locationService.getLocationsByTenant(tenantId);
 
       // Return only minimal data needed for registration
       // Always return an array, even if empty
-      const publicBranches = branches.map((branch) => ({
-        id: branch.id,
-        name: branch.name,
-        address: branch.address,
+      const publicLocations = locations.map((location) => ({
+        id: location.id,
+        name: location.name,
+        address: location.address,
       }));
 
-      // Return empty array if no branches found (this is valid - tenant might not have branches yet)
-      res.json(publicBranches);
+      // Return empty array if no locations found (this is valid - tenant might not have locations yet)
+      res.json(publicLocations);
     } catch (error: any) {
       console.error('Error in getBranchesForRegistration:', error);
-      res.status(500).json({ message: error.message || "Failed to fetch branches" });
+      res.status(500).json({ message: error.message || "Failed to fetch locations" });
     }
   }
   /**

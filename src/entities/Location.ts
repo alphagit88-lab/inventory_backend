@@ -12,8 +12,8 @@ import { Inventory } from "./Inventory";
 import { Invoice } from "./Invoice";
 import { StockMovement } from "./StockMovement";
 
-@Entity()
-export class Branch {
+@Entity("branch") // Keep table name as 'branch' to avoid database migration
+export class Location {
   @PrimaryGeneratedColumn("uuid")
   id: string;
 

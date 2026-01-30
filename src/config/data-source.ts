@@ -2,7 +2,7 @@ import "reflect-metadata";
 import { DataSource } from "typeorm";
 import dotenv from "dotenv";
 import { Tenant } from "../entities/Tenant";
-import { Branch } from "../entities/Branch";
+import { Location } from "../entities/Location";
 import { User } from "../entities/User";
 import { Product } from "../entities/Product";
 import { ProductVariant } from "../entities/ProductVariant";
@@ -59,7 +59,7 @@ export const AppDataSource = new DataSource({
   ssl: (process.env.DB_SSL === "true" || process.env.NODE_ENV === "production") ? { rejectUnauthorized: false } : false, // Enable SSL in production or if explicitly set
   entities: [
     Tenant,
-    Branch,
+    Location,
     User,
     Product,
     ProductVariant,

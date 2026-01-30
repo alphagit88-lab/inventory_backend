@@ -1,25 +1,25 @@
 import { AppDataSource } from "../config/data-source";
 import { User, UserRole } from "../entities/User";
-import { Branch } from "../entities/Branch";
+import { Location } from "../entities/Location";
 import bcrypt from "bcryptjs";
 
 export class UserService {
   private userRepository = AppDataSource.getRepository(User);
-  private branchRepository = AppDataSource.getRepository(Branch);
+  private locationRepository = AppDataSource.getRepository(Location);
 
-  async createBranchUser(
+  async createLocationUser(
     tenantId: string,
-    branchId: string,
+    locationId: string,
     email: string,
     password: string
   ) {
-    // Verify branch belongs to tenant
-    const branch = await this.branchRepository.findOne({
-      where: { id: branchId, tenant: { id: tenantId } },
+    // Verify location belongs to tenant
+    const location = await this.locationRepository.findOne({
+      where: { id: locationId, tenant: { id: tenantId } },
     });
 
-    if (!branch) {
-      throw new Error("Branch not found or does not belong to tenant");
+    if (!location) {
+      throw new Error("Location not found or does not belong to tenant");
     }
 
     // Check if user already exists
@@ -36,37 +36,64 @@ export class UserService {
     const user = this.userRepository.create({
       email,
       password_hash: hashedPassword,
-      role: UserRole.BRANCH_USER,
+      role: UserRole.LOCATION_USER,
       tenant: { id: tenantId },
-      branch: { id: branchId },
+      location: { id: locationId },
+    });
+
+    return await this.userRepository.save(user);
+  }
+
+  async createStoreAdmin(
+    tenantId: string,
+    email: string,
+    password: string,
+    locationId?: string
+  ) {
+    // Check if user already exists
+    const existingUser = await this.userRepository.findOne({
+      where: { email },
+    });
+
+    if (existingUser) {
+      throw new Error("User with this email already exists");
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = this.userRepository.create({
+      email,
+      password_hash: hashedPassword,
+      role: UserRole.STORE_ADMIN,
+      tenant: { id: tenantId },
+      location: locationId ? { id: locationId } : undefined,
     });
 
     return await this.userRepository.save(user);
   }
 
   async getUsersByTenant(tenantId: string) {
-    // Only return branch users, not Store Admins
+    // Return all users (location users and store admins) for the tenant
     return await this.userRepository.find({
-      where: { 
-        tenant: { id: tenantId },
-        role: UserRole.BRANCH_USER
+      where: {
+        tenant: { id: tenantId }
       },
-      relations: ["branch", "tenant"],
+      relations: ["location", "tenant"],
       order: { email: "ASC" },
     });
   }
 
   async getAllUsers() {
     return await this.userRepository.find({
-      relations: ["branch", "tenant"],
+      relations: ["location", "tenant"],
       order: { email: "ASC" },
     });
   }
 
-  async getUsersByBranch(branchId: string) {
+  async getUsersByLocation(locationId: string) {
     return await this.userRepository.find({
-      where: { branch: { id: branchId } },
-      relations: ["branch"],
+      where: { location: { id: locationId } },
+      relations: ["location"],
       order: { email: "ASC" },
     });
   }
@@ -74,7 +101,7 @@ export class UserService {
   async getUserById(id: string) {
     const user = await this.userRepository.findOne({
       where: { id },
-      relations: ["tenant", "branch"],
+      relations: ["tenant", "location"],
     });
 
     if (!user) {
@@ -84,7 +111,7 @@ export class UserService {
     return user;
   }
 
-  async updateUser(id: string, data: { email?: string; branchId?: string }) {
+  async updateUser(id: string, data: { email?: string; locationId?: string }) {
     const user = await this.getUserById(id);
 
     if (data.email) {
@@ -100,17 +127,17 @@ export class UserService {
       user.email = data.email;
     }
 
-    if (data.branchId) {
-      // Verify branch belongs to same tenant
-      const branch = await this.branchRepository.findOne({
-        where: { id: data.branchId, tenant: { id: user.tenant.id } },
+    if (data.locationId) {
+      // Verify location belongs to same tenant
+      const location = await this.locationRepository.findOne({
+        where: { id: data.locationId, tenant: { id: user.tenant.id } },
       });
 
-      if (!branch) {
-        throw new Error("Branch not found or does not belong to tenant");
+      if (!location) {
+        throw new Error("Location not found or does not belong to tenant");
       }
 
-      user.branch = branch;
+      user.location = location;
     }
 
     return await this.userRepository.save(user);
@@ -119,6 +146,12 @@ export class UserService {
   async deleteUser(id: string) {
     const user = await this.getUserById(id);
     return await this.userRepository.remove(user);
+  }
+
+  async toggleUserStatus(id: string) {
+    const user = await this.getUserById(id);
+    user.isActive = !user.isActive;
+    return await this.userRepository.save(user);
   }
 }
 

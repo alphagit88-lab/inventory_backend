@@ -6,34 +6,56 @@ import { UserRole } from "../entities/User";
 const userService = new UserService();
 
 export class UserController {
-  async createBranchUser(req: AuthRequest, res: Response): Promise<void> {
+  async createLocationUser(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const { email, password, branchId } = req.body;
-      const tenantId = req.user?.tenantId;
+      const { email, password, locationId: bodyLocationId, tenantId: bodyTenantId } = req.body;
+
+      console.log('[CREATE_LOCATION_USER] Request received');
+      console.log('[CREATE_LOCATION_USER] User role:', req.user?.role);
+      console.log('[CREATE_LOCATION_USER] Session tenantId:', req.user?.tenantId);
+      console.log('[CREATE_LOCATION_USER] Session locationId:', req.user?.locationId);
+      console.log('[CREATE_LOCATION_USER] Body tenantId:', bodyTenantId);
+      console.log('[CREATE_LOCATION_USER] Body locationId:', bodyLocationId);
+
+      // Super Admin can provide tenantId in body, others use from session
+      const tenantId = req.user?.role === UserRole.SUPER_ADMIN
+        ? (bodyTenantId || req.user?.tenantId)
+        : req.user?.tenantId;
+
+      // For Super Admin, require location context to be set
+      const locationId = req.user?.role === UserRole.SUPER_ADMIN
+        ? (bodyLocationId || req.user?.locationId)
+        : bodyLocationId;
+
+      console.log('[CREATE_LOCATION_USER] Final tenantId:', tenantId);
+      console.log('[CREATE_LOCATION_USER] Final locationId:', locationId);
 
       if (!tenantId) {
-        res.status(400).json({ message: "Tenant ID is required" });
+        const message = req.user?.role === UserRole.SUPER_ADMIN
+          ? "Tenant ID is required. Please switch context to a shop first."
+          : "Tenant ID is required";
+        res.status(400).json({ message });
         return;
       }
 
-      if (!email || !password || !branchId) {
+      if (!locationId) {
+        const message = req.user?.role === UserRole.SUPER_ADMIN
+          ? "Location ID is required. Please switch context to a specific location first."
+          : "Location ID is required";
+        res.status(400).json({ message });
+        return;
+      }
+
+      if (!email || !password) {
         res.status(400).json({
-          message: "Email, password, and branch ID are required",
+          message: "Email and password are required",
         });
         return;
       }
 
-      // Only Store Admin can create Branch Users
-      if (req.user?.role !== UserRole.STORE_ADMIN) {
-        res.status(403).json({
-          message: "Only Store Admin can create Branch Users",
-        });
-        return;
-      }
-
-      const user = await userService.createBranchUser(
+      const user = await userService.createLocationUser(
         tenantId,
-        branchId,
+        locationId,
         email,
         password
       );
@@ -46,21 +68,63 @@ export class UserController {
     }
   }
 
-  async getByTenant(req: AuthRequest, res: Response): Promise<void> {
+  async createStoreAdmin(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const tenantId = req.user?.tenantId;
+      const { email, password, tenantId: bodyTenantId, locationId } = req.body;
 
-      // Store Admin needs tenantId
-      if (!tenantId) {
-        res.status(400).json({ message: "Tenant ID is required" });
+      // Only Super Admin can create Store Admin
+      if (req.user?.role !== UserRole.SUPER_ADMIN) {
+        res.status(403).json({ message: "Only Super Admin can create Store Admin users" });
         return;
       }
 
-      // Only Store Admin can view users
-      if (req.user?.role !== UserRole.STORE_ADMIN) {
-        res.status(403).json({
-          message: "Insufficient permissions",
+      // Super Admin must provide tenantId
+      const tenantId = bodyTenantId || req.user?.tenantId;
+
+      if (!tenantId) {
+        res.status(400).json({ message: "Tenant ID is required. Please switch context or provide tenantId in request body." });
+        return;
+      }
+
+      if (!email || !password) {
+        res.status(400).json({
+          message: "Email and password are required",
         });
+        return;
+      }
+
+      const user = await userService.createStoreAdmin(
+        tenantId,
+        email,
+        password,
+        locationId
+      );
+
+      // Don't return password hash
+      const { password_hash, ...userResponse } = user;
+      res.status(201).json(userResponse);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  }
+
+  async getByTenant(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      // Super Admin can provide tenantId in query params, others use from session
+      const tenantId = req.user?.role === UserRole.SUPER_ADMIN
+        ? (req.query.tenantId as string || req.user?.tenantId)
+        : req.user?.tenantId;
+
+      // For super admin without context, return all users
+      if (req.user?.role === UserRole.SUPER_ADMIN && !tenantId) {
+        const users = await userService.getAllUsers();
+        const usersResponse = users.map(({ password_hash, ...user }) => user);
+        res.json(usersResponse);
+        return;
+      }
+
+      if (!tenantId) {
+        res.status(400).json({ message: "Tenant ID is required" });
         return;
       }
 
@@ -72,16 +136,16 @@ export class UserController {
     }
   }
 
-  async getByBranch(req: AuthRequest, res: Response): Promise<void> {
+  async getByLocation(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const branchId = req.params.branchId || req.user?.branchId;
+      const locationId = req.params.locationId || req.user?.locationId;
 
-      if (!branchId) {
-        res.status(400).json({ message: "Branch ID is required" });
+      if (!locationId) {
+        res.status(400).json({ message: "Location ID is required" });
         return;
       }
 
-      const users = await userService.getUsersByBranch(branchId as string);
+      const users = await userService.getUsersByLocation(locationId as string);
       const usersResponse = users.map(({ password_hash, ...user }) => user);
       res.json(usersResponse);
     } catch (error: any) {
@@ -105,10 +169,10 @@ export class UserController {
   async update(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      const { email, branchId } = req.body;
+      const { email, locationId } = req.body;
 
-      // Only Store Admin can update users
-      if (req.user?.role !== UserRole.STORE_ADMIN) {
+      // Only Store Admin and Super Admin can update users
+      if (req.user?.role !== UserRole.STORE_ADMIN && req.user?.role !== UserRole.SUPER_ADMIN) {
         res.status(403).json({
           message: "Insufficient permissions",
         });
@@ -117,7 +181,7 @@ export class UserController {
 
       const user = await userService.updateUser(id as string, {
         email,
-        branchId,
+        locationId,
       });
 
       const { password_hash, ...userResponse } = user;
@@ -131,15 +195,15 @@ export class UserController {
     try {
       const { id } = req.params;
 
-      // Only Store Admin can delete users
-      if (req.user?.role !== UserRole.STORE_ADMIN) {
+      // Only Store Admin and Super Admin can delete users
+      if (req.user?.role !== UserRole.STORE_ADMIN && req.user?.role !== UserRole.SUPER_ADMIN) {
         res.status(403).json({
           message: "Insufficient permissions",
         });
         return;
       }
 
-      // Prevent Store Admin from deleting themselves
+      // Prevent users from deleting themselves
       if (req.user?.userId === id) {
         res.status(403).json({
           message: "You cannot delete your own account",
@@ -149,17 +213,39 @@ export class UserController {
 
       // Get the user to check their role
       const userToDelete = await userService.getUserById(id as string);
-      
-      // Prevent deleting Store Admin accounts (only branch users can be deleted)
-      if (userToDelete.role !== UserRole.BRANCH_USER) {
+
+      // Store Admin can only delete location users
+      // Super Admin can delete any user
+      if (req.user?.role === UserRole.STORE_ADMIN && userToDelete.role !== UserRole.LOCATION_USER) {
         res.status(403).json({
-          message: "Only branch users can be deleted",
+          message: "Store Admins can only delete location users",
         });
         return;
       }
 
       await userService.deleteUser(id as string);
       res.json({ message: "User deleted successfully" });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  }
+
+  async toggleStatus(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+
+      // Only Store Admin and Super Admin can toggle user status
+      if (req.user?.role !== UserRole.STORE_ADMIN && req.user?.role !== UserRole.SUPER_ADMIN) {
+        res.status(403).json({
+          message: "Insufficient permissions",
+        });
+        return;
+      }
+
+      const user = await userService.toggleUserStatus(id as string);
+
+      const { password_hash, ...userResponse } = user;
+      res.json(userResponse);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }

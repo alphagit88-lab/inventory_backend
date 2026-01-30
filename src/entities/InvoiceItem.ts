@@ -34,6 +34,12 @@ export class InvoiceItem {
   @Column("decimal", { precision: 10, scale: 2 })
   cost_price: number;
 
+  @Column("decimal", { precision: 5, scale: 2, nullable: true, default: 0 })
+  discount: number;
+
+  @Column("decimal", { precision: 10, scale: 2, nullable: true })
+  original_price: number;
+
   @Column("decimal", { precision: 10, scale: 2 })
   subtotal: number;
 }

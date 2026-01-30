@@ -7,7 +7,7 @@ import {
   JoinColumn,
 } from "typeorm";
 import { Tenant } from "./Tenant";
-import { Branch } from "./Branch";
+import { Location } from "./Location";
 import { ProductVariant } from "./ProductVariant";
 
 export enum MovementType {
@@ -24,11 +24,11 @@ export class StockMovement {
   @JoinColumn({ name: "tenant_id" })
   tenant: Tenant;
 
-  @ManyToOne(() => Branch, (branch) => branch.stock_movements, {
+  @ManyToOne(() => Location, (location) => location.stock_movements, {
     onDelete: "CASCADE",
   })
   @JoinColumn({ name: "branch_id" })
-  branch: Branch;
+  location: Location;
 
   @ManyToOne(() => ProductVariant, (variant) => variant.stock_movements, {
     onDelete: "CASCADE",

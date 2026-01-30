@@ -5,7 +5,7 @@ import {
   OneToMany,
   CreateDateColumn,
 } from "typeorm";
-import { Branch } from "./Branch";
+import { Location } from "./Location";
 import { Product } from "./Product";
 import { User } from "./User";
 
@@ -33,8 +33,8 @@ export class Tenant {
   @CreateDateColumn()
   created_at: Date;
 
-  @OneToMany(() => Branch, (branch) => branch.tenant)
-  branches: Branch[];
+  @OneToMany(() => Location, (location) => location.tenant)
+  locations: Location[];
 
   @OneToMany(() => Product, (product) => product.tenant)
   products: Product[];

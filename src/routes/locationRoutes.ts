@@ -1,54 +1,54 @@
 import { Router } from "express";
-import { BranchController } from "../controllers/branchController";
+import { LocationController } from "../controllers/locationController";
 import { authenticate, authorize } from "../middleware/auth";
 import { ensureTenantIsolation } from "../middleware/tenantIsolation";
 import { UserRole } from "../entities/User";
 
 const router = Router();
-const branchController = new BranchController();
+const locationController = new LocationController();
 
 // All routes require authentication
 router.use(authenticate);
 
-// Create and list branches - Store Admin and Super Admin
+// Create and list locations - Store Admin and Super Admin
 router.post(
   "/",
   authorize(UserRole.STORE_ADMIN),
   ensureTenantIsolation,
-  (req, res) => branchController.create(req, res)
+  (req, res) => locationController.create(req, res)
 );
 
 router.get(
   "/",
   authorize(UserRole.STORE_ADMIN),
   ensureTenantIsolation,
-  (req, res) => branchController.getByTenant(req, res)
+  (req, res) => locationController.getByTenant(req, res)
 );
 
-// Get, update, delete specific branch
+// Get, update, delete specific location
 router.get("/:id", ensureTenantIsolation, (req, res) =>
-  branchController.getById(req, res)
+  locationController.getById(req, res)
 );
 
 router.put(
   "/:id",
   authorize(UserRole.STORE_ADMIN),
   ensureTenantIsolation,
-  (req, res) => branchController.update(req, res)
+  (req, res) => locationController.update(req, res)
 );
 
 router.delete(
   "/:id",
   authorize(UserRole.STORE_ADMIN),
   ensureTenantIsolation,
-  (req, res) => branchController.delete(req, res)
+  (req, res) => locationController.delete(req, res)
 );
 
-// Super Admin only - get branches by any tenant
+// Super Admin only - get locations by any tenant
 router.get(
   "/by-tenant/:tenantId",
   authorize(UserRole.SUPER_ADMIN),
-  (req, res) => branchController.getAllByTenantId(req, res)
+  (req, res) => locationController.getAllByTenantId(req, res)
 );
 
 export default router;

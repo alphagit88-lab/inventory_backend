@@ -8,7 +8,7 @@ import {
   JoinColumn,
 } from "typeorm";
 import { Tenant } from "./Tenant";
-import { Branch } from "./Branch";
+import { Location } from "./Location";
 import { InvoiceItem } from "./InvoiceItem";
 
 @Entity()
@@ -20,14 +20,17 @@ export class Invoice {
   @JoinColumn({ name: "tenant_id" })
   tenant: Tenant;
 
-  @ManyToOne(() => Branch, (branch) => branch.invoices, {
+  @ManyToOne(() => Location, (location) => location.invoices, {
     onDelete: "CASCADE",
   })
   @JoinColumn({ name: "branch_id" })
-  branch: Branch;
+  location: Location;
 
   @Column({ unique: true })
   invoice_number: string;
+
+  @Column({ nullable: true })
+  customer_name: string;
 
   @Column("decimal", { precision: 10, scale: 2 })
   total_amount: number;

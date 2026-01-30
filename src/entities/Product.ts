@@ -21,8 +21,14 @@ export class Product {
   @Column()
   name: string;
 
+  @Column({ nullable: true, unique: false })
+  product_code: string;
+
   @Column({ nullable: true })
   category: string;
+
+  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true, default: 0 })
+  discount: number;
 
   @OneToMany(() => ProductVariant, (variant) => variant.product)
   variants: ProductVariant[];

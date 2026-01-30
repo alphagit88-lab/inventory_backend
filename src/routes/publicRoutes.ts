@@ -15,7 +15,12 @@ router.get("/tenants", (req, res) =>
   publicController.getTenantsForRegistration(req, res)
 );
 
-// Get branches for a tenant (public, for registration)
+// Get locations for a tenant (public, for registration)
+router.get("/locations/:tenantId", (req, res) =>
+  publicController.getBranchesForRegistration(req, res)
+);
+
+// Legacy route for backward compatibility
 router.get("/branches/:tenantId", (req, res) =>
   publicController.getBranchesForRegistration(req, res)
 );

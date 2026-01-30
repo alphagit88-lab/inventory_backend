@@ -9,7 +9,7 @@ export class InventoryService {
 
   async stockIn(
     tenantId: string,
-    branchId: string,
+    locationId: string,
     productVariantId: string,
     quantity: number,
     costPrice: number,
@@ -18,7 +18,7 @@ export class InventoryService {
   ) {
     const existing = await this.inventoryRepository.findOne({
       where: {
-        branch: { id: branchId },
+        location: { id: locationId },
         product_variant: { id: productVariantId },
       },
     });
@@ -36,7 +36,7 @@ export class InventoryService {
       // Record stock movement
       await this.createStockMovement(
         tenantId,
-        branchId,
+        locationId,
         productVariantId,
         MovementType.STOCK_IN,
         quantity,
@@ -52,7 +52,7 @@ export class InventoryService {
       // Create new inventory record
       const inventory = this.inventoryRepository.create({
         tenant: { id: tenantId },
-        branch: { id: branchId },
+        location: { id: locationId },
         product_variant: { id: productVariantId },
         quantity: quantityAfter,
         cost_price: costPrice,
@@ -64,7 +64,7 @@ export class InventoryService {
       // Record stock movement
       await this.createStockMovement(
         tenantId,
-        branchId,
+        locationId,
         productVariantId,
         MovementType.STOCK_IN,
         quantity,
@@ -81,7 +81,7 @@ export class InventoryService {
 
   private async createStockMovement(
     tenantId: string,
-    branchId: string,
+    locationId: string,
     productVariantId: string,
     movementType: MovementType,
     quantity: number,
@@ -94,7 +94,7 @@ export class InventoryService {
   ) {
     const movement = this.stockMovementRepository.create({
       tenant: { id: tenantId },
-      branch: { id: branchId },
+      location: { id: locationId },
       product_variant: { id: productVariantId },
       movement_type: movementType,
       quantity,
@@ -109,24 +109,31 @@ export class InventoryService {
     return await this.stockMovementRepository.save(movement);
   }
 
-  async getInventoryByBranch(branchId: string) {
+  async getInventoryByLocation(locationId: string) {
     return await this.inventoryRepository.find({
-      where: { branch: { id: branchId } },
-      relations: ["product_variant", "product_variant.product"],
+      where: { location: { id: locationId } },
+      relations: ["location", "product_variant", "product_variant.product"],
     });
   }
 
   async getInventoryByTenant(tenantId: string) {
     return await this.inventoryRepository.find({
       where: { tenant: { id: tenantId } },
-      relations: ["branch", "product_variant", "product_variant.product"],
+      relations: ["location", "product_variant", "product_variant.product"],
     });
   }
 
-  async checkStock(branchId: string, productVariantId: string) {
+  async getAllInventory() {
+    return await this.inventoryRepository.find({
+      relations: ["location", "product_variant", "product_variant.product", "tenant"],
+      order: { location: { name: "ASC" } },
+    });
+  }
+
+  async checkStock(locationId: string, productVariantId: string) {
     const inventory = await this.inventoryRepository.findOne({
       where: {
-        branch: { id: branchId },
+        location: { id: locationId },
         product_variant: { id: productVariantId },
       },
       relations: ["product_variant", "product_variant.product"],
@@ -136,24 +143,30 @@ export class InventoryService {
       return { available: false, quantity: 0 };
     }
 
+    const discount = Number(inventory.product_variant?.product?.discount ?? 0);
+    const sellingPrice = Number(inventory.selling_price ?? 0);
+    const discountedPrice = sellingPrice - (sellingPrice * discount / 100);
+
     return {
       available: inventory.quantity > 0,
       quantity: inventory.quantity,
       costPrice: inventory.cost_price,
       sellingPrice: inventory.selling_price,
+      discount: discount,
+      discountedPrice: discountedPrice,
     };
   }
 
   async deductStock(
     tenantId: string,
-    branchId: string,
+    locationId: string,
     productVariantId: string,
     quantity: number,
     referenceId?: string
   ) {
     const inventory = await this.inventoryRepository.findOne({
       where: {
-        branch: { id: branchId },
+        location: { id: locationId },
         product_variant: { id: productVariantId },
       },
     });
@@ -175,7 +188,7 @@ export class InventoryService {
     // Record stock movement
     await this.createStockMovement(
       tenantId,
-      branchId,
+      locationId,
       productVariantId,
       MovementType.STOCK_OUT,
       quantity,
@@ -191,14 +204,14 @@ export class InventoryService {
   }
 
   async getStockMovements(
-    branchId: string,
+    locationId: string,
     productVariantId?: string,
     startDate?: Date,
     endDate?: Date
   ) {
     const query = this.stockMovementRepository
       .createQueryBuilder("movement")
-      .where("movement.branch_id = :branchId", { branchId })
+      .where("movement.branch_id = :locationId", { locationId })
       .leftJoinAndSelect("movement.product_variant", "product_variant")
       .leftJoinAndSelect("product_variant.product", "product")
       .orderBy("movement.created_at", "DESC");
@@ -221,7 +234,7 @@ export class InventoryService {
 
   async getStockStatus(
     tenantId: string,
-    branchId?: string,
+    locationId?: string,
     size?: string,
     category?: string,
     brand?: string
@@ -232,12 +245,12 @@ export class InventoryService {
       .leftJoinAndSelect("product_variant.product", "product")
       .where("inventory.tenant_id = :tenantId", { tenantId });
 
-    if (branchId) {
-      query.andWhere("inventory.branch_id = :branchId", { branchId });
+    if (locationId) {
+      query.andWhere("inventory.branch_id = :locationId", { locationId });
     }
 
     if (size) {
-      query.andWhere("product_variant.size = :size", { size });
+      query.andWhere("product_variant.variant_name ILIKE :size", { size: `%${size}%` });
     }
 
     if (category) {
@@ -245,32 +258,31 @@ export class InventoryService {
     }
 
     if (brand) {
-      query.andWhere("product_variant.brand = :brand", { brand });
+      query.andWhere("product_variant.variant_name ILIKE :brand", { brand: `%${brand}%` });
     }
 
     const results = await query.getMany();
 
-    // Group by product and size, aggregate quantities across branches
+    // Group by product and size, aggregate quantities across locations
     const aggregated: Record<string, any> = {};
 
     for (const inv of results) {
-      const key = `${inv.product_variant.product.name}_${inv.product_variant.size}_${inv.product_variant.brand}`;
+      const key = `${inv.product_variant.product.name}_${inv.product_variant.variant_name}`;
 
       if (!aggregated[key]) {
         aggregated[key] = {
           productName: inv.product_variant.product.name,
           category: inv.product_variant.product.category,
-          brand: inv.product_variant.brand,
-          size: inv.product_variant.size,
+          variantName: inv.product_variant.variant_name,
           totalQuantity: 0,
-          branches: [],
+          locations: [],
         };
       }
 
       aggregated[key].totalQuantity += inv.quantity;
-      aggregated[key].branches.push({
-        branchId: inv.branch.id,
-        branchName: inv.branch.name,
+      aggregated[key].locations.push({
+        locationId: inv.location.id,
+        locationName: inv.location.name,
         quantity: inv.quantity,
         costPrice: inv.cost_price,
         sellingPrice: inv.selling_price,
@@ -280,9 +292,9 @@ export class InventoryService {
     return Object.values(aggregated);
   }
 
-  async getLocalStockReport(branchId: string) {
+  async getLocalStockReport(locationId: string) {
     const inventory = await this.inventoryRepository.find({
-      where: { branch: { id: branchId } },
+      where: { location: { id: locationId } },
       relations: ["product_variant", "product_variant.product"],
     });
 
@@ -297,8 +309,7 @@ export class InventoryService {
       items: inventory.map((inv) => ({
         productName: inv.product_variant.product.name,
         category: inv.product_variant.product.category,
-        brand: inv.product_variant.brand,
-        size: inv.product_variant.size,
+        variantName: inv.product_variant.variant_name,
         quantity: inv.quantity,
         costPrice: inv.cost_price,
         sellingPrice: inv.selling_price,

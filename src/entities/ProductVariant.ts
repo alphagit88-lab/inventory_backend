@@ -13,7 +13,7 @@ import { InvoiceItem } from "./InvoiceItem";
 import { StockMovement } from "./StockMovement";
 
 @Entity()
-@Unique(["product", "brand", "size"])
+@Unique(["product", "variant_name"])
 export class ProductVariant {
   @PrimaryGeneratedColumn("uuid")
   id: string;
@@ -25,10 +25,7 @@ export class ProductVariant {
   product: Product;
 
   @Column()
-  brand: string;
-
-  @Column()
-  size: string;
+  variant_name: string;
 
   @OneToMany(() => Inventory, (inventory) => inventory.product_variant)
   inventory: Inventory[];

@@ -10,47 +10,61 @@ const userController = new UserController();
 // All routes require authentication
 router.use(authenticate, ensureTenantIsolation);
 
-// Create Branch User - Store Admin only
-// Support both /users and /users/branch-user for backward compatibility
+// Create Location User - Store Admin and Super Admin
+// Support both /users and /users/location-user for backward compatibility
 router.post(
   "/",
   authorize(UserRole.STORE_ADMIN),
-  (req, res) => userController.createBranchUser(req, res)
+  (req, res) => userController.createLocationUser(req, res)
 );
 
 router.post(
-  "/branch-user",
+  "/location-user",
   authorize(UserRole.STORE_ADMIN),
-  (req, res) => userController.createBranchUser(req, res)
+  (req, res) => userController.createLocationUser(req, res)
 );
 
-// Get users by tenant - Store Admin only
+// Create Store Admin - Super Admin only
+router.post(
+  "/store-admin",
+  authorize(UserRole.SUPER_ADMIN),
+  (req, res) => userController.createStoreAdmin(req, res)
+);
+
+// Get users by tenant - Store Admin and Super Admin
 router.get(
   "/tenant",
   authorize(UserRole.STORE_ADMIN),
   (req, res) => userController.getByTenant(req, res)
 );
 
-// Get users by branch
-router.get("/branch/:branchId", (req, res) =>
-  userController.getByBranch(req, res)
+// Get users by location
+router.get("/location/:locationId", (req, res) =>
+  userController.getByLocation(req, res)
 );
 
 // Get user by ID
 router.get("/:id", (req, res) => userController.getById(req, res));
 
-// Update user - Store Admin only
+// Update user - Store Admin and Super Admin
 router.put(
   "/:id",
   authorize(UserRole.STORE_ADMIN),
   (req, res) => userController.update(req, res)
 );
 
-// Delete user - Store Admin only
+// Delete user - Store Admin and Super Admin
 router.delete(
   "/:id",
   authorize(UserRole.STORE_ADMIN),
   (req, res) => userController.delete(req, res)
+);
+
+// Toggle user status (active/inactive) - Store Admin and Super Admin
+router.patch(
+  "/:id/toggle-status",
+  authorize(UserRole.STORE_ADMIN),
+  (req, res) => userController.toggleStatus(req, res)
 );
 
 export default router;

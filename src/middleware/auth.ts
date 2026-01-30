@@ -8,7 +8,7 @@ interface SessionData {
     email: string;
     role: UserRole;
     tenantId: string | null;
-    branchId: string | null;
+    locationId: string | null;
   };
 }
 
@@ -18,7 +18,7 @@ export interface AuthRequest extends Request {
     email: string;
     role: UserRole;
     tenantId: string | null;
-    branchId: string | null;
+    locationId: string | null;
   };
   session: Session & SessionData;
 }
@@ -31,7 +31,7 @@ export const authenticate = (
   console.log(`[AUTH] Checking session for ${req.method} ${req.path}`);
   console.log(`[AUTH] Session exists:`, !!req.session);
   console.log(`[AUTH] Session user:`, req.session?.user ? 'exists' : 'missing');
-  
+
   // Check if user is in session
   if (req.session && req.session.user) {
     req.user = {
@@ -39,9 +39,11 @@ export const authenticate = (
       email: req.session.user.email,
       role: req.session.user.role,
       tenantId: req.session.user.tenantId ?? null,
-      branchId: req.session.user.branchId ?? null,
+      locationId: req.session.user.locationId ?? null,
     };
     console.log(`[AUTH] User authenticated: ${req.user.email} (${req.user.role})`);
+    console.log(`[AUTH] Session tenantId: ${req.user.tenantId}`);
+    console.log(`[AUTH] Session locationId: ${req.user.locationId}`);
     next();
     return;
   }
@@ -58,11 +60,31 @@ export const authorize = (...roles: UserRole[]) => {
       return;
     }
 
-    if (!roles.includes(req.user.role)) {
-      res.status(403).json({ message: "Insufficient permissions" });
+    // Role hierarchy: Super Admin > Store Admin > Location User
+    const roleHierarchy: Record<UserRole, number> = {
+      [UserRole.SUPER_ADMIN]: 3,
+      [UserRole.STORE_ADMIN]: 2,
+      [UserRole.LOCATION_USER]: 1,
+    };
+
+    // Super Admin can access all routes
+    if (req.user.role === UserRole.SUPER_ADMIN) {
+      next();
       return;
     }
 
-    next();
+    // Get the minimum required role level from the allowed roles
+    const minRequiredLevel = Math.min(...roles.map(role => roleHierarchy[role]));
+    const userLevel = roleHierarchy[req.user.role];
+
+    // User can access if their level is >= minimum required level
+    if (userLevel >= minRequiredLevel) {
+      next();
+      return;
+    }
+
+    // User doesn't have sufficient permissions
+    res.status(403).json({ message: "Insufficient permissions" });
+    return;
   };
 };

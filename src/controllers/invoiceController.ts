@@ -2,38 +2,41 @@ import { Response } from "express";
 import { AuthRequest } from "../middleware/auth";
 import { InvoiceService } from "../services/invoiceService";
 import { AppDataSource } from "../config/data-source";
-import { Branch } from "../entities/Branch";
+import { Location } from "../entities/Location";
 
 const invoiceService = new InvoiceService();
 
 export class InvoiceController {
   async create(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const { items, taxAmount, changeAmount } = req.body;
-      let tenantId = req.user?.tenantId;
-      const branchId = req.user?.branchId || req.body.branchId;
+      const { items, taxAmount, changeAmount, customerName, tenantId: bodyTenantId } = req.body;
+      // Super Admin can provide tenantId in body, others use from session
+      let tenantId = req.user?.role === "super_admin"
+        ? (bodyTenantId || req.user?.tenantId)
+        : req.user?.tenantId;
+      const locationId = req.user?.locationId || req.body.locationId;
 
-      // Validate branchId - Branch Users must have a branch assigned
-      if (!branchId) {
+      // Validate locationId - Location Users must have a location assigned
+      if (!locationId) {
         res.status(400).json({ 
-          message: "Branch ID is required. Please contact your administrator to assign you to a branch." 
+          message: "Location ID is required. Please contact your administrator to assign you to a location." 
         });
         return;
       }
 
-      // If tenantId is not available from user, get it from the branch
-      if (!tenantId && branchId) {
-        const branchRepository = AppDataSource.getRepository(Branch);
-        const branch = await branchRepository.findOne({
-          where: { id: branchId },
+      // If tenantId is not available from user, get it from the location
+      if (!tenantId && locationId) {
+        const locationRepository = AppDataSource.getRepository(Location);
+        const location = await locationRepository.findOne({
+          where: { id: locationId },
           relations: ["tenant"],
         });
         
-        if (branch && branch.tenant) {
-          tenantId = branch.tenant.id;
-        } else if (!branch) {
+        if (location && location.tenant) {
+          tenantId = location.tenant.id;
+        } else if (!location) {
           res.status(400).json({ 
-            message: "Invalid branch ID: Branch not found" 
+            message: "Invalid location ID: Location not found" 
           });
           return;
         }
@@ -69,20 +72,21 @@ export class InvoiceController {
         }
       }
 
-      // For Branch Users, ensure they can only create invoices for their own branch
-      if (req.user?.role === "branch_user" && req.user?.branchId !== branchId) {
+      // For Location Users, ensure they can only create invoices for their own location
+      if (req.user?.role === "location_user" && req.user?.locationId !== locationId) {
         res.status(403).json({ 
-          message: "Access denied: You can only create invoices for your assigned branch." 
+          message: "Access denied: You can only create invoices for your assigned location." 
         });
         return;
       }
 
       const invoice = await invoiceService.createInvoice(
         tenantId,
-        branchId,
+        locationId,
         items,
         taxAmount,
-        changeAmount
+        changeAmount,
+        customerName
       );
 
       res.status(201).json(invoice);
@@ -105,16 +109,16 @@ export class InvoiceController {
     }
   }
 
-  async getByBranch(req: AuthRequest, res: Response): Promise<void> {
+  async getByLocation(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const branchId = req.user?.branchId || req.params.branchId;
+      const locationId = req.user?.locationId || req.params.locationId;
 
-      if (!branchId) {
-        res.status(400).json({ message: "Branch ID is required" });
+      if (!locationId) {
+        res.status(400).json({ message: "Location ID is required" });
         return;
       }
 
-      const invoices = await invoiceService.getInvoicesByBranch(branchId as string);
+      const invoices = await invoiceService.getInvoicesByLocation(locationId as string);
       res.json(invoices);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -123,7 +127,16 @@ export class InvoiceController {
 
   async getByTenant(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const tenantId = req.user?.tenantId;
+      const tenantId = req.user?.role === "super_admin"
+        ? (req.query.tenantId as string || req.user?.tenantId)
+        : req.user?.tenantId;
+
+      // For super admin without context, return all invoices
+      if (req.user?.role === "super_admin" && !tenantId) {
+        const invoices = await invoiceService.getAllInvoices();
+        res.json(invoices);
+        return;
+      }
 
       if (!tenantId) {
         res.status(400).json({ message: "Tenant ID is required" });
@@ -140,17 +153,17 @@ export class InvoiceController {
   async getByDateRange(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { startDate, endDate } = req.query;
-      const branchId = req.user?.branchId || req.query.branchId;
+      const locationId = req.user?.locationId || req.query.locationId;
 
-      if (!branchId || !startDate || !endDate) {
+      if (!locationId || !startDate || !endDate) {
         res.status(400).json({
-          message: "Branch ID, start date, and end date are required",
+          message: "Location ID, start date, and end date are required",
         });
         return;
       }
 
       const invoices = await invoiceService.getInvoicesByDateRange(
-        branchId as string,
+        locationId as string,
         new Date(startDate as string),
         new Date(endDate as string)
       );
@@ -164,17 +177,17 @@ export class InvoiceController {
   async calculateProfit(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { startDate, endDate } = req.query;
-      const branchId = req.user?.branchId || req.query.branchId;
+      const locationId = req.user?.locationId || req.query.locationId;
 
-      if (!branchId || !startDate || !endDate) {
+      if (!locationId || !startDate || !endDate) {
         res.status(400).json({
-          message: "Branch ID, start date, and end date are required",
+          message: "Location ID, start date, and end date are required",
         });
         return;
       }
 
       const profit = await invoiceService.calculateProfit(
-        branchId as string,
+        locationId as string,
         new Date(startDate as string),
         new Date(endDate as string)
       );
@@ -187,11 +200,11 @@ export class InvoiceController {
 
   async getDailySales(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const branchId = req.user?.branchId || req.query.branchId;
+      const locationId = req.user?.locationId || req.query.locationId;
       const date = req.query.date ? new Date(req.query.date as string) : new Date();
 
-      if (!branchId) {
-        res.status(400).json({ message: "Branch ID is required" });
+      if (!locationId) {
+        res.status(400).json({ message: "Location ID is required" });
         return;
       }
 
@@ -201,7 +214,7 @@ export class InvoiceController {
       endDate.setHours(23, 59, 59, 999);
 
       const invoices = await invoiceService.getInvoicesByDateRange(
-        branchId as string,
+        locationId as string,
         startDate,
         endDate
       );
@@ -214,7 +227,7 @@ export class InvoiceController {
 
       res.json({
         date: date.toISOString().split("T")[0],
-        branchId,
+        locationId,
         totalRevenue,
         totalInvoices,
         invoices,
@@ -224,23 +237,23 @@ export class InvoiceController {
     }
   }
 
-  async getDailySalesByBranch(req: AuthRequest, res: Response): Promise<void> {
+  async getDailySalesByLocation(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const branchId = req.params.branchId || req.user?.branchId;
+      const locationId = req.params.locationId || req.user?.locationId;
       const date = req.query.date ? new Date(req.query.date as string) : new Date();
 
-      if (!branchId) {
-        res.status(400).json({ message: "Branch ID is required" });
+      if (!locationId) {
+        res.status(400).json({ message: "Location ID is required" });
         return;
       }
 
-      // Branch Users can only access their own branch's data
+      // Location Users can only access their own location's data
       if (
-        req.user?.role === "branch_user" &&
-        req.user?.branchId !== branchId
+        req.user?.role === "location_user" &&
+        req.user?.locationId !== locationId
       ) {
         res.status(403).json({
-          message: "Access denied: You can only view your own branch's data",
+          message: "Access denied: You can only view your own location's data",
         });
         return;
       }
@@ -251,7 +264,7 @@ export class InvoiceController {
       endDate.setHours(23, 59, 59, 999);
 
       const invoices = await invoiceService.getInvoicesByDateRange(
-        branchId as string,
+        locationId as string,
         startDate,
         endDate
       );
@@ -264,7 +277,7 @@ export class InvoiceController {
 
       res.json({
         date: date.toISOString().split("T")[0],
-        branchId,
+        locationId,
         totalRevenue,
         totalInvoices,
         invoices,
