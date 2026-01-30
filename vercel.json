@@ -8,12 +8,28 @@
   ],
   "routes": [
     {
+      "src": "/api/(.*)",
+      "methods": [
+        "OPTIONS"
+      ],
+      "dest": "api/index.ts",
+      "headers": {
+        "Access-Control-Allow-Origin": "https://inventory-frontend-tau-six.vercel.app",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, Cookie",
+        "Access-Control-Allow-Credentials": "true"
+      }
+    },
+    {
       "src": "/(.*)",
-      "dest": "api/index.ts"
+      "dest": "api/index.ts",
+      "headers": {
+        "Access-Control-Allow-Origin": "https://inventory-frontend-tau-six.vercel.app",
+        "Access-Control-Allow-Credentials": "true"
+      }
     }
   ],
   "env": {
     "NODE_ENV": "production"
   }
 }
-
