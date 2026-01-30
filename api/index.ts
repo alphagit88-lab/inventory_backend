@@ -1,4 +1,8 @@
+// IMPORTANT: reflect-metadata must be imported first for TypeORM
+import "reflect-metadata";
+
 import { AppDataSource } from "../src/config/data-source";
+import app from "../src/app";
 
 // Initialize database connection (singleton pattern for serverless)
 let dbInitialized = false;
@@ -13,6 +17,8 @@ async function initializeDatabase() {
       console.error("❌ Database connection failed:", error);
       throw error;
     }
+  } else if (AppDataSource.isInitialized) {
+    dbInitialized = true;
   }
 }
 
@@ -36,26 +42,17 @@ export default async function handler(req: any, res: any) {
     }
 
     // Initialize database for actual requests
-    try {
-      await initializeDatabase();
-    } catch (dbError) {
-      console.error("Database init failed:", dbError);
-      return res.status(500).json({
-        error: "Database connection failed",
-        message: dbError instanceof Error ? dbError.message : "Unknown error"
-      });
-    }
-
-    // Import and use Express app
-    const app = (await import("../src/app")).default;
+    await initializeDatabase();
 
     // Handle the request with Express app
     return app(req, res);
   } catch (error) {
     console.error("Handler error:", error);
+    setCorsHeaders(res);
     return res.status(500).json({
       error: "Internal server error",
-      message: error instanceof Error ? error.message : "Unknown error"
+      message: error instanceof Error ? error.message : "Unknown error",
+      stack: process.env.NODE_ENV === "development" ? (error instanceof Error ? error.stack : undefined) : undefined
     });
   }
 }
