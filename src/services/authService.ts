@@ -119,6 +119,8 @@ export class AuthService {
         role: user.role,
         tenantId: user.tenant?.id || null,
         locationId: user.location?.id || null,
+        tenant: user.tenant ? { id: user.tenant.id, name: user.tenant.name } : null,
+        location: user.location ? { id: user.location.id, name: user.location.name } : null,
       },
     };
   }
