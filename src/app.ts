@@ -83,11 +83,37 @@ app.use(
     cookie: {
       secure: isProduction,
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000,
-      sameSite: isProduction ? "none" : "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      sameSite: isProduction ? "none" as const : "lax" as const,
+      domain: isProduction ? undefined : undefined, // Let the browser set the domain automatically
     },
   })
 );
+
+// Add middleware to ensure cookies have Partitioned attribute for cross-site usage
+if (isProduction) {
+  app.use((req, res, next) => {
+    const originalSetHeader = res.setHeader.bind(res);
+    res.setHeader = function (name: string, value: any) {
+      if (name === 'Set-Cookie' || name === 'set-cookie') {
+        if (typeof value === 'string') {
+          if (!value.includes('Partitioned')) {
+            value = value + '; Partitioned';
+          }
+        } else if (Array.isArray(value)) {
+          value = value.map((v: string) => {
+            if (typeof v === 'string' && !v.includes('Partitioned')) {
+              return v + '; Partitioned';
+            }
+            return v;
+          });
+        }
+      }
+      return originalSetHeader(name, value);
+    };
+    next();
+  });
+}
 
 app.use(express.json());
 
